@@ -10,7 +10,7 @@ def test_build_app_wires_window_coordinator_and_tray(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CURRENT_DESKTOP", "")  # force "other" -> Null backends, no real I/O
     monkeypatch.setenv("XDG_SESSION_TYPE", "")
 
-    app, window, coordinator, tray = build_app([])
+    app, window, coordinator, tray, quit_app = build_app([])
 
     assert window.isVisible() is False or window.isVisible() is True  # constructed without error
     assert coordinator is not None

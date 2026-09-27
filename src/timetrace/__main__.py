@@ -44,7 +44,7 @@ def build_app(argv: list[str]):
     if not is_primary_instance:
         iface = QDBusInterface("org.timetrace.App", "/App", "", bus)
         iface.call("Raise")
-        return app, None, None, None
+        return app, None, None, None, None
 
     config = load_config(paths.config_file_path())
 
@@ -114,18 +114,32 @@ def build_app(argv: list[str]):
     window._event_timer = event_timer  # keep references alive
     window._refresh_timer = refresh_timer
 
-    return app, window, coordinator, tray
+    return app, window, coordinator, tray, quit_app
 
 
 def main(argv: Optional[list[str]] = None) -> int:
+    import signal
+
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["--version"]:
         print(f"timetrace {__version__}")
         return 0
 
-    app, window, coordinator, tray = build_app(sys.argv[:1] + argv)
+    app, window, coordinator, tray, quit_app = build_app(sys.argv[:1] + argv)
     if window is None:
         return 0  # another instance is already running and was asked to raise its window
+
+    # SIGTERM/SIGINT are the standard way to stop a background GUI app without
+    # UI access (logout, systemd stop, `kill`, Ctrl+C) -- without a handler,
+    # Python's default action just terminates the process, skipping quit_app's
+    # cleanup (coordinator.stop() -> backend teardown, e.g. the KWin script
+    # backend unloading its script; store.close()). Calling straight into
+    # quit_app() here is the standard pragmatic PySide6/Qt pattern for a
+    # quit-once-on-shutdown path; Python only runs the handler once control
+    # returns to the interpreter, which happens on every 250ms event_timer
+    # tick, so delivery latency is bounded by that.
+    signal.signal(signal.SIGTERM, lambda *_: quit_app())
+    signal.signal(signal.SIGINT, lambda *_: quit_app())
 
     window.show()
     return app.exec()
