@@ -1,7 +1,7 @@
 # src/timetrace/db.py
 import sqlite3
 from dataclasses import dataclass
-from datetime import date, datetime, time, tzinfo
+from datetime import date, datetime, time, timedelta, tzinfo
 from pathlib import Path
 
 SCHEMA = """
@@ -41,8 +41,9 @@ class AppInterval:
 
 def day_bounds_ts(day: date, tz: tzinfo) -> tuple[int, int]:
     start = datetime.combine(day, time.min, tzinfo=tz)
+    end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=tz)
     start_ts = int(start.timestamp() * 1000)
-    end_ts = start_ts + 24 * 3600 * 1000
+    end_ts = int(end.timestamp() * 1000)
     return start_ts, end_ts
 
 
