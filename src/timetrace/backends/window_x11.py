@@ -64,14 +64,19 @@ class X11EwmhActiveWindowBackend:
         self._stop_event.clear()
 
         def loop() -> None:
-            while not self._stop_event.is_set():
-                changed = self._client.wait_for_active_window_change(0.5)
-                if changed and not self._stop_event.is_set():
-                    info = self._client.get_active_window_info()
-                    if info is not None:
-                        resource_class, title = info
-                        on_window_changed(resource_class, title, int(time.time() * 1000))
-            self._client.close()
+            try:
+                while not self._stop_event.is_set():
+                    try:
+                        changed = self._client.wait_for_active_window_change(0.5)
+                        if changed and not self._stop_event.is_set():
+                            info = self._client.get_active_window_info()
+                            if info is not None:
+                                resource_class, title = info
+                                on_window_changed(resource_class, title, int(time.time() * 1000))
+                    except Exception:
+                        continue
+            finally:
+                self._client.close()
 
         self._thread = threading.Thread(target=loop, daemon=True)
         self._thread.start()
