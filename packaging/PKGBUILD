@@ -1,0 +1,16 @@
+# Maintainer: <name> <email>
+pkgname=timetrace
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Simplified ManicTime-alike time tracker for KDE and GNOME"
+arch=('x86_64')
+url="https://github.com/<owner>/timetrace"
+license=('MIT')
+depends=()
+source_x86_64=("timetrace-${pkgver}-x86_64.bin::https://github.com/<owner>/timetrace/releases/download/v${pkgver}/timetrace")
+sha256sums_x86_64=('SKIP')
+
+package() {
+    install -Dm755 "${srcdir}/timetrace-${pkgver}-x86_64.bin" "${pkgdir}/usr/bin/timetrace"
+    install -Dm644 "${startdir}/timetrace.desktop" "${pkgdir}/usr/share/applications/timetrace.desktop"
+}
