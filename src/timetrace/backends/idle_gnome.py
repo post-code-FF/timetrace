@@ -16,14 +16,28 @@ class QtMutterIdleDBusConnector:
     INTERFACE = "org.gnome.Mutter.IdleMonitor"
 
     def __init__(self) -> None:
+        from PySide6.QtCore import QObject, SLOT, Slot
         from PySide6.QtDBus import QDBusConnection, QDBusInterface
 
         self._bus = QDBusConnection.sessionBus()
         self._iface = QDBusInterface(self.SERVICE, self.PATH, self.INTERFACE, self._bus)
         self._callbacks: dict[int, Callable[[], None]] = {}
+
+        # QDBusConnection.connect() requires a QObject receiver plus a
+        # Qt slot signature (built via SLOT()) — a plain Python callable
+        # is not an accepted overload. Route the D-Bus signal to a tiny
+        # QObject whose slot forwards to our real handler.
+        outer = self
+
+        class _WatchFiredReceiver(QObject):
+            @Slot("uint")
+            def on_watch_fired(self, watch_id: int) -> None:
+                outer._on_watch_fired(watch_id)
+
+        self._watch_fired_receiver = _WatchFiredReceiver()
         self._bus.connect(
             self.SERVICE, self.PATH, self.INTERFACE, "WatchFired",
-            self._on_watch_fired,
+            self._watch_fired_receiver, SLOT("on_watch_fired(uint)"),
         )
 
     def add_idle_watch(self, ms: int, callback: Callable[[], None]) -> int:
