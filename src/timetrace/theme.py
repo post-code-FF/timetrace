@@ -27,12 +27,31 @@ def _unwrap_dbus_variant(value):
     return value
 
 
+def _portal_value_to_abstract(portal_value: int) -> int:
+    """Translate the real org.freedesktop.appearance color-scheme value
+    to this module's abstract reader/subscriber contract.
+
+    The real portal setting uses 0=no-preference, 1=prefer-dark,
+    2=prefer-light. read_system_color_scheme/watch_system_color_scheme
+    (and their tests) use a different, simpler convention via the
+    injected reader/subscriber: 0="light", 1="dark", anything else
+    ="unknown". Without this translation, a real light preference
+    (portal 2) would incorrectly report "unknown", and no-preference
+    (portal 0, a common default) would incorrectly report "light" with
+    false confidence. This mapping is applied only in the real (non-test)
+    D-Bus code paths -- the abstract contract and its 5 tests are
+    untouched.
+    """
+    return {1: 1, 2: 0}.get(portal_value, -1)
+
+
 def _real_reader() -> int:
     from PySide6.QtDBus import QDBusInterface
 
     iface = QDBusInterface(_SERVICE, _PATH, _INTERFACE)
     reply = iface.call("Read", _NAMESPACE, _KEY)
-    return int(_unwrap_dbus_variant(reply.arguments()[0]))
+    portal_value = int(_unwrap_dbus_variant(reply.arguments()[0]))
+    return _portal_value_to_abstract(portal_value)
 
 
 def read_system_color_scheme(reader: Callable[[], int] | None = None) -> ColorScheme:
@@ -62,7 +81,8 @@ def _real_subscriber(handler: Callable[[int], None]) -> Callable[[], None]:
         @Slot(str, str, "QDBusVariant")
         def on_setting_changed(self, namespace: str, key: str, value) -> None:
             if namespace == _NAMESPACE and key == _KEY:
-                handler(int(_unwrap_dbus_variant(value)))
+                portal_value = int(_unwrap_dbus_variant(value))
+                handler(_portal_value_to_abstract(portal_value))
 
     receiver = _SettingChangedReceiver()
     bus.connect(
