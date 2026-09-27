@@ -1,0 +1,81 @@
+from collections.abc import Sequence
+from dataclasses import dataclass
+
+from PySide6.QtCore import QRectF
+from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtWidgets import QWidget
+
+TRACK_HEIGHT_PX = 28
+
+
+@dataclass(frozen=True)
+class Segment:
+    x: float
+    width: float
+    color: tuple[int, int, int]
+
+
+def intervals_to_segments(
+    intervals: Sequence[tuple[int, int, tuple[int, int, int]]],
+    day_start_ts: int,
+    day_end_ts: int,
+    track_width_px: float,
+) -> list[Segment]:
+    day_span = day_end_ts - day_start_ts
+    if day_span <= 0:
+        return []
+    segments = []
+    for start_ts, end_ts, color in intervals:
+        x = (start_ts - day_start_ts) / day_span * track_width_px
+        width = (end_ts - start_ts) / day_span * track_width_px
+        segments.append(Segment(x=x, width=width, color=color))
+    return segments
+
+
+class TimelineTrackWidget(QWidget):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setMinimumHeight(TRACK_HEIGHT_PX)
+        self._intervals: list[tuple[int, int, tuple[int, int, int]]] = []
+        self._day_start_ts = 0
+        self._day_end_ts = 1
+        self._current_time_ts: int | None = None
+
+    def set_intervals(
+        self,
+        intervals: Sequence[tuple[int, int, tuple[int, int, int]]],
+        day_start_ts: int,
+        day_end_ts: int,
+    ) -> None:
+        self._intervals = list(intervals)
+        self._day_start_ts = day_start_ts
+        self._day_end_ts = day_end_ts
+        self.update()
+
+    def set_current_time_ts(self, ts: int | None) -> None:
+        self._current_time_ts = ts
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        width = self.width()
+        height = self.height()
+
+        painter.fillRect(0, 0, width, height, QColor(60, 60, 60))
+
+        segments = intervals_to_segments(
+            self._intervals, self._day_start_ts, self._day_end_ts, float(width)
+        )
+        for segment in segments:
+            painter.fillRect(
+                QRectF(segment.x, 0, segment.width, height), QColor(*segment.color)
+            )
+
+        if self._current_time_ts is not None:
+            day_span = self._day_end_ts - self._day_start_ts
+            if day_span > 0:
+                x = (self._current_time_ts - self._day_start_ts) / day_span * width
+                painter.setPen(QPen(QColor(255, 0, 0), 2))
+                painter.drawLine(int(x), 0, int(x), height)
+
+        painter.end()
