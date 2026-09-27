@@ -1,0 +1,87 @@
+from timetrace.backends.idle_gnome import MutterIdleMonitorBackend
+
+
+class FakeConnector:
+    def __init__(self):
+        self.idle_watches: dict[int, tuple[int, object]] = {}
+        self.active_watches: dict[int, object] = {}
+        self._next_id = 1
+
+    def add_idle_watch(self, ms, callback):
+        watch_id = self._next_id
+        self._next_id += 1
+        self.idle_watches[watch_id] = (ms, callback)
+        return watch_id
+
+    def add_active_watch(self, callback):
+        watch_id = self._next_id
+        self._next_id += 1
+        self.active_watches[watch_id] = callback
+        return watch_id
+
+    def remove_watch(self, watch_id):
+        self.idle_watches.pop(watch_id, None)
+        self.active_watches.pop(watch_id, None)
+
+    def fire_idle(self, watch_id):
+        self.idle_watches[watch_id][1]()
+
+    def fire_active(self, watch_id):
+        self.active_watches[watch_id]()
+
+
+def test_start_registers_idle_watch_at_threshold():
+    connector = FakeConnector()
+    backend = MutterIdleMonitorBackend(dbus_connector=connector)
+    backend.start(threshold_ms=5000, on_idle=lambda ts: None, on_resume=lambda ts: None)
+    assert list(connector.idle_watches.values())[0][0] == 5000
+
+
+def test_idle_watch_fires_on_idle_and_registers_active_watch():
+    connector = FakeConnector()
+    events = []
+    backend = MutterIdleMonitorBackend(dbus_connector=connector)
+    backend.start(
+        threshold_ms=5000,
+        on_idle=lambda ts: events.append("idle"),
+        on_resume=lambda ts: events.append("resume"),
+    )
+    idle_watch_id = next(iter(connector.idle_watches))
+    connector.fire_idle(idle_watch_id)
+    assert events == ["idle"]
+    assert len(connector.active_watches) == 1  # armed to detect resume
+
+
+def test_active_watch_fires_on_resume_and_rearms_idle_watch():
+    connector = FakeConnector()
+    events = []
+    backend = MutterIdleMonitorBackend(dbus_connector=connector)
+    backend.start(
+        threshold_ms=5000,
+        on_idle=lambda ts: events.append("idle"),
+        on_resume=lambda ts: events.append("resume"),
+    )
+    idle_watch_id = next(iter(connector.idle_watches))
+    connector.fire_idle(idle_watch_id)
+    active_watch_id = next(iter(connector.active_watches))
+    connector.fire_active(active_watch_id)
+    assert events == ["idle", "resume"]
+    assert len(connector.idle_watches) == 1  # re-armed for next idle period
+
+
+def test_update_threshold_removes_old_watch_and_adds_new_one():
+    connector = FakeConnector()
+    backend = MutterIdleMonitorBackend(dbus_connector=connector)
+    backend.start(threshold_ms=5000, on_idle=lambda ts: None, on_resume=lambda ts: None)
+    backend.update_threshold(9000)
+    assert len(connector.idle_watches) == 1
+    assert list(connector.idle_watches.values())[0][0] == 9000
+
+
+def test_stop_removes_all_watches():
+    connector = FakeConnector()
+    backend = MutterIdleMonitorBackend(dbus_connector=connector)
+    backend.start(threshold_ms=5000, on_idle=lambda ts: None, on_resume=lambda ts: None)
+    backend.stop()
+    assert connector.idle_watches == {}
+    assert connector.active_watches == {}
