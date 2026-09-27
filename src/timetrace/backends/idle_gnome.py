@@ -21,15 +21,15 @@ class QtMutterIdleDBusConnector:
         self._bus = QDBusConnection.sessionBus()
         self._iface = QDBusInterface(self.SERVICE, self.PATH, self.INTERFACE, self._bus)
         self._callbacks: dict[int, Callable[[], None]] = {}
+        self._bus.connect(
+            self.SERVICE, self.PATH, self.INTERFACE, "WatchFired",
+            self._on_watch_fired,
+        )
 
     def add_idle_watch(self, ms: int, callback: Callable[[], None]) -> int:
         reply = self._iface.call("AddIdleWatch", ms)
         watch_id = int(reply.arguments()[0])
         self._callbacks[watch_id] = callback
-        self._bus.connect(
-            self.SERVICE, self.PATH, self.INTERFACE, "WatchFired",
-            self._on_watch_fired,
-        )
         return watch_id
 
     def add_active_watch(self, callback: Callable[[], None]) -> int:
@@ -91,6 +91,8 @@ class MutterIdleMonitorBackend:
 
     def update_threshold(self, threshold_ms: int) -> None:
         self._threshold_ms = threshold_ms
+        if self._active_watch_id is not None:
+            return  # currently idle; new threshold applies next time an idle watch is armed
         if self._idle_watch_id is not None:
             self._connector.remove_watch(self._idle_watch_id)
         self._arm_idle_watch()

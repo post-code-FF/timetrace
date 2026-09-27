@@ -78,6 +78,19 @@ def test_update_threshold_removes_old_watch_and_adds_new_one():
     assert list(connector.idle_watches.values())[0][0] == 9000
 
 
+def test_update_threshold_while_idle_does_not_leak_a_watch():
+    connector = FakeConnector()
+    backend = MutterIdleMonitorBackend(dbus_connector=connector)
+    backend.start(threshold_ms=5000, on_idle=lambda ts: None, on_resume=lambda ts: None)
+    idle_watch_id = next(iter(connector.idle_watches))
+    connector.fire_idle(idle_watch_id)  # now idle, active watch outstanding
+
+    backend.update_threshold(9000)  # must not arm a second idle watch
+
+    assert connector.idle_watches == {}  # no idle watch should exist while idle
+    assert len(connector.active_watches) == 1  # only the original active watch
+
+
 def test_stop_removes_all_watches():
     connector = FakeConnector()
     backend = MutterIdleMonitorBackend(dbus_connector=connector)
