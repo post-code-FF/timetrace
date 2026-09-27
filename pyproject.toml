@@ -24,6 +24,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "timetrace.assets.kwin_script" = ["metadata.json", "contents/code/main.js"]
+"timetrace.assets.gnome_extension" = ["metadata.json", "extension.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
