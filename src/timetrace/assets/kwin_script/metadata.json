@@ -1,0 +1,7 @@
+{
+    "KPlugin": {
+        "Id": "timetrace-active-window",
+        "Name": "TimeTrace Active Window Reporter"
+    },
+    "X-KDE-ServiceTypes": ["KWin/Script"]
+}
