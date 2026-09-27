@@ -38,7 +38,11 @@ class X11ScreenSaverIdleBackend:
 
         def loop() -> None:
             while not self._stop_event.is_set():
-                idle_ms = self._query_idle_ms()
+                try:
+                    idle_ms = self._query_idle_ms()
+                except Exception:
+                    self._stop_event.wait(self._poll_interval_s)
+                    continue
                 now_ts = int(time.time() * 1000)
                 assert self._state_machine is not None
                 transition = self._state_machine.feed(idle_ms, now_ts)
