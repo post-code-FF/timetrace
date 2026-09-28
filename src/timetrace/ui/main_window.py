@@ -54,6 +54,8 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(central)
 
+        self.app_track.segmentHovered.connect(self.app_list.set_highlighted_resource_class)
+
         self._date_nav.dateChanged.connect(lambda _d: self.refresh())
         self.refresh()
 
@@ -72,7 +74,7 @@ class MainWindow(QMainWindow):
 
         app_rows = self._store.app_intervals_for_day(day_start_ts, day_end_ts, now_ts)
         app_tuples = [
-            (r.start_ts, r.end_ts, color_for_resource_class(r.resource_class))
+            (r.start_ts, r.end_ts, color_for_resource_class(r.resource_class), r.resource_class)
             for r in app_rows
         ]
         self.app_track.set_intervals(app_tuples, day_start_ts, day_end_ts)

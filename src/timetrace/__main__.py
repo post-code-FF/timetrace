@@ -78,6 +78,7 @@ def build_app(argv: list[str]):
     window = MainWindow(store, tz=tz)
 
     def open_settings() -> None:
+        nonlocal config
         dialog = SettingsDialog(
             config,
             config_path=paths.config_file_path(),
@@ -86,6 +87,7 @@ def build_app(argv: list[str]):
             exec_path="timetrace",
         )
         dialog.exec()
+        config = load_config(paths.config_file_path())
 
     window.settingsRequested.connect(open_settings)
 

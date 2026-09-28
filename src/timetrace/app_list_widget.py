@@ -1,11 +1,14 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QHeaderView, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
 from timetrace.app_color import color_for_resource_class
 from timetrace.db import AppInterval
 from timetrace.icons import resolve_icon
+
+_HIGHLIGHT_COLOR = QColor(100, 150, 220, 90)
 
 
 @dataclass(frozen=True)
@@ -16,9 +19,10 @@ class AppSummary:
 
 
 def format_duration(ms: int) -> str:
-    total_minutes = ms // 60_000
-    hours, minutes = divmod(total_minutes, 60)
-    return f"{hours}:{minutes:02d}"
+    total_seconds = ms // 1000
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours}:{minutes:02d}:{seconds:02d}"
 
 
 def aggregate_app_durations(intervals: Sequence[AppInterval]) -> list[AppSummary]:
@@ -47,7 +51,8 @@ class AppListWidget(QWidget):
         self._table.setHorizontalHeaderLabels(["Приложение", "Доля", "Длительность"])
         self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self._table.verticalHeader().setVisible(False)
-        self._total_label = QLabel("Всего: 0:00")
+        self._total_label = QLabel("Всего: 0:00:00")
+        self._highlighted_resource_class: str | None = None
 
         layout = QVBoxLayout(self)
         layout.addWidget(self._table)
@@ -65,7 +70,26 @@ class AppListWidget(QWidget):
 
         total_ms = sum(s.total_ms for s in summaries)
         self._total_label.setText(f"Всего: {format_duration(total_ms)}")
+        self._apply_highlight()
 
     def set_total_label_text(self, text: str) -> None:
         """Allows main_window.py to override with the presence-based total (Task 22)."""
         self._total_label.setText(text)
+
+    def set_highlighted_resource_class(self, resource_class: str | None) -> None:
+        self._highlighted_resource_class = resource_class
+        self._apply_highlight()
+
+    def _apply_highlight(self) -> None:
+        for row in range(self._table.rowCount()):
+            name_item = self._table.item(row, 0)
+            is_match = (
+                self._highlighted_resource_class is not None
+                and name_item is not None
+                and name_item.text() == self._highlighted_resource_class
+            )
+            brush = QBrush(_HIGHLIGHT_COLOR) if is_match else QBrush()
+            for col in range(self._table.columnCount()):
+                cell = self._table.item(row, col)
+                if cell is not None:
+                    cell.setBackground(brush)
