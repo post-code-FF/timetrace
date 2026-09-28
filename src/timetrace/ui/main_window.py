@@ -30,8 +30,8 @@ class MainWindow(QMainWindow):
         self._now_provider = now_provider or (lambda: datetime.now(tz))
 
         self.setWindowTitle("TimeTrace")
-        self.setMinimumSize(760, 560)
-        self.resize(1000, 760)
+        self.setMinimumSize(760, 620)
+        self.resize(1000, 820)
 
         central = QWidget(self)
         layout = QVBoxLayout(central)

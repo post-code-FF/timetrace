@@ -5,7 +5,8 @@ from PySide6.QtCore import QRectF, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
-TRACK_HEIGHT_PX = 64
+TRACK_HEIGHT_PX = 96
+MIN_SEGMENT_WIDTH_PX = 4.0
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,9 @@ def intervals_to_segments(
         resource_class = interval[3] if len(interval) > 3 else None
         x = (start_ts - day_start_ts) / day_span * track_width_px
         width = (end_ts - start_ts) / day_span * track_width_px
+        if width < MIN_SEGMENT_WIDTH_PX:
+            x -= (MIN_SEGMENT_WIDTH_PX - width) / 2
+            width = MIN_SEGMENT_WIDTH_PX
         segments.append(Segment(x=x, width=width, color=color, resource_class=resource_class))
     return segments
 

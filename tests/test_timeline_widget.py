@@ -51,6 +51,16 @@ def test_multiple_intervals_preserve_order():
     assert segments[1].width == 75.0
 
 
+def test_tiny_interval_gets_minimum_clickable_width():
+    segments = intervals_to_segments(
+        [(500, 501, (0, 255, 0))], day_start_ts=0, day_end_ts=1000, track_width_px=100
+    )
+    assert len(segments) == 1
+    assert segments[0].width == 4.0
+    # centered on the original (sub-pixel) midpoint: x=50.0, width=0.1
+    assert segments[0].x == 48.05
+
+
 def test_segment_resource_class_defaults_to_none_for_three_tuples():
     segments = intervals_to_segments(
         [(0, 1000, (0, 255, 0))], day_start_ts=0, day_end_ts=1000, track_width_px=100
