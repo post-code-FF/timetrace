@@ -28,6 +28,19 @@ def test_find_desktop_entry_falls_back_to_exec_basename(tmp_path):
     assert found == entry
 
 
+def test_find_desktop_entry_matches_gnome_style_id_with_desktop_suffix(tmp_path):
+    # Shell.WindowTracker.get_window_app(win).get_id() on GNOME returns the
+    # desktop file's id including the ".desktop" suffix, unlike X11/KDE's
+    # bare WM_CLASS.
+    apps_dir = tmp_path / "applications"
+    apps_dir.mkdir()
+    entry = apps_dir / "org.mozilla.firefox.desktop"
+    write_desktop_file(entry, name="Firefox", exec_="firefox %u", icon="firefox")
+
+    found = find_desktop_entry("org.mozilla.firefox.desktop", search_dirs=[apps_dir])
+    assert found == entry
+
+
 def test_find_desktop_entry_returns_none_when_no_match(tmp_path):
     apps_dir = tmp_path / "applications"
     apps_dir.mkdir()

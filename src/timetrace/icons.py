@@ -17,6 +17,13 @@ def find_desktop_entry(
 ) -> Path | None:
     dirs = search_dirs if search_dirs is not None else _DEFAULT_SEARCH_DIRS
     target = resource_class.lower()
+    # GNOME's Shell.WindowTracker reports app ids as the desktop file's id
+    # including the ".desktop" suffix (e.g. "org.mozilla.firefox.desktop"),
+    # unlike X11/KDE's bare WM_CLASS -- strip it so the comparisons below
+    # (against StartupWMClass, Exec basename, and file stem, none of which
+    # carry the suffix) can still match.
+    if target.endswith(".desktop"):
+        target = target[: -len(".desktop")]
     candidates = []
     for directory in dirs:
         if not directory.is_dir():

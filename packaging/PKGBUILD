@@ -4,11 +4,11 @@ pkgver=0.1.0
 pkgrel=1
 pkgdesc="Time tracker for KDE and GNOME"
 arch=('x86_64')
-url="https://github.com/<owner>/timetrace"
+url="https://github.com/post-code-FF/timetrace"
 license=('MIT')
 depends=()
 makedepends=('imagemagick')
-source_x86_64=("timetrace-${pkgver}-x86_64.bin::https://github.com/<owner>/timetrace/releases/download/v${pkgver}/timetrace")
+source_x86_64=("timetrace-${pkgver}-x86_64.bin::https://github.com/post-code-FF/timetrace/releases/download/v${pkgver}/timetrace")
 sha256sums_x86_64=('SKIP')
 
 package() {

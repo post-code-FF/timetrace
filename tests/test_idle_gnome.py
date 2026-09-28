@@ -134,16 +134,23 @@ def test_rearm_failure_after_resume_does_not_raise():
     assert backend._idle_watch_id is None  # degraded: no idle watch armed anymore
 
 
-def test_require_reply_arg_raises_clear_error_on_empty_reply():
-    class ErrorReply:
-        def arguments(self):
-            return []
+class FakeCompletedProcess:
+    def __init__(self, returncode, stdout="", stderr=""):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
 
-        def errorMessage(self):
-            return "org.freedesktop.DBus.Error.ServiceUnknown"
 
+def test_call_raises_clear_error_on_nonzero_exit(monkeypatch):
+    import subprocess
+
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda *a, **k: FakeCompletedProcess(1, stderr="GDBus.Error:...ServiceUnknown"),
+    )
+    connector = QtMutterIdleDBusConnector.__new__(QtMutterIdleDBusConnector)
     try:
-        QtMutterIdleDBusConnector._require_reply_arg(ErrorReply(), "AddIdleWatch")
+        connector._call("AddIdleWatch", "uint64 5000")
         raised = False
     except RuntimeError as exc:
         raised = True
@@ -152,9 +159,41 @@ def test_require_reply_arg_raises_clear_error_on_empty_reply():
     assert raised
 
 
-def test_require_reply_arg_returns_first_argument_on_success():
-    class OkReply:
-        def arguments(self):
-            return [42]
+def test_call_returns_stdout_on_success(monkeypatch):
+    import subprocess
 
-    assert QtMutterIdleDBusConnector._require_reply_arg(OkReply(), "AddIdleWatch") == 42
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: FakeCompletedProcess(0, stdout="(5,)\n"))
+    connector = QtMutterIdleDBusConnector.__new__(QtMutterIdleDBusConnector)
+    assert connector._call("AddIdleWatch", "uint64 5000") == "(5,)"
+
+
+def test_call_passes_explicitly_typed_gvariant_arguments(monkeypatch):
+    import subprocess
+
+    captured = {}
+
+    def fake_run(argv, **kwargs):
+        captured["argv"] = argv
+        return FakeCompletedProcess(0, stdout="(5,)\n")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    connector = QtMutterIdleDBusConnector.__new__(QtMutterIdleDBusConnector)
+    connector._call("AddIdleWatch", "uint64 5000")
+    # Must be an explicit GVariant-typed literal (e.g. "uint64 5000"), not a
+    # bare number -- a bare int would be ambiguous and mismarshal, which is
+    # exactly the bug this connector works around (see class docstring).
+    assert "uint64 5000" in captured["argv"]
+
+
+def test_parse_reply_uint_extracts_id_from_gvariant_tuple():
+    assert QtMutterIdleDBusConnector._parse_reply_uint("(5,)", "AddIdleWatch") == 5
+
+
+def test_parse_reply_uint_raises_on_unexpected_output():
+    try:
+        QtMutterIdleDBusConnector._parse_reply_uint("garbage", "AddIdleWatch")
+        raised = False
+    except RuntimeError as exc:
+        raised = True
+        assert "AddIdleWatch" in str(exc)
+    assert raised

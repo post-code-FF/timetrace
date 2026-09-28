@@ -23,7 +23,7 @@ def _make_single_instance_adaptor(on_raise):
 def build_app(argv: list[str]):
     from PySide6.QtCore import QTimer
     from PySide6.QtDBus import QDBusConnection, QDBusInterface
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
     from timetrace import paths, theme
     from timetrace.backends.idle_factory import select_idle_backend
@@ -37,7 +37,7 @@ def build_app(argv: list[str]):
     from timetrace.ui.settings_dialog import SettingsDialog
     from timetrace.ui.tray import TrayIcon
 
-    app = QApplication(argv)
+    app = QApplication.instance() or QApplication(argv)
     app.setQuitOnLastWindowClosed(False)
 
     bus = QDBusConnection.sessionBus()
@@ -111,8 +111,15 @@ def build_app(argv: list[str]):
         store.close()
         app.quit()
 
-    tray = TrayIcon(window, on_quit=quit_app)
-    tray.show()
+    # Stock GNOME Shell runs no org.freedesktop.StatusNotifierWatcher (tray
+    # support there is an opt-in extension), so QSystemTrayIcon there just
+    # spams stderr with D-Bus "ServiceUnknown"/"not activatable" errors for
+    # an icon that will never appear. isSystemTrayAvailable() reflects that
+    # ahead of time; skip the tray rather than create a doomed one.
+    tray = None
+    if QSystemTrayIcon.isSystemTrayAvailable():
+        tray = TrayIcon(window, on_quit=quit_app)
+        tray.show()
 
     event_timer = QTimer()
     event_timer.timeout.connect(coordinator.process_pending_events)
