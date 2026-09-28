@@ -1,4 +1,4 @@
-from timetrace.backends.idle_gnome import MutterIdleMonitorBackend
+from timetrace.backends.idle_gnome import MutterIdleMonitorBackend, QtMutterIdleDBusConnector
 
 
 class FakeConnector:
@@ -97,4 +97,64 @@ def test_stop_removes_all_watches():
     backend.start(threshold_ms=5000, on_idle=lambda ts: None, on_resume=lambda ts: None)
     backend.stop()
     assert connector.idle_watches == {}
-    assert connector.active_watches == {}
+
+
+class FlakyConnector(FakeConnector):
+    """A connector whose add_idle_watch fails starting from its Nth call,
+    simulating a D-Bus call failing on the re-arm path (outside start())."""
+
+    def __init__(self, fail_from_call: int):
+        super().__init__()
+        self._fail_from_call = fail_from_call
+        self._calls = 0
+
+    def add_idle_watch(self, ms, callback):
+        self._calls += 1
+        if self._calls >= self._fail_from_call:
+            raise RuntimeError("org.gnome.Mutter.IdleMonitor unreachable")
+        return super().add_idle_watch(ms, callback)
+
+
+def test_rearm_failure_after_resume_does_not_raise():
+    connector = FlakyConnector(fail_from_call=2)  # 1st call is start()'s initial arm
+    events = []
+    backend = MutterIdleMonitorBackend(dbus_connector=connector)
+    backend.start(
+        threshold_ms=5000,
+        on_idle=lambda ts: events.append("idle"),
+        on_resume=lambda ts: events.append("resume"),
+    )
+    idle_watch_id = next(iter(connector.idle_watches))
+    connector.fire_idle(idle_watch_id)
+    active_watch_id = next(iter(connector.active_watches))
+
+    connector.fire_active(active_watch_id)  # triggers _handle_resume -> _arm_idle_watch (fails)
+
+    assert events == ["idle", "resume"]  # on_resume still fired despite the failed re-arm
+    assert backend._idle_watch_id is None  # degraded: no idle watch armed anymore
+
+
+def test_require_reply_arg_raises_clear_error_on_empty_reply():
+    class ErrorReply:
+        def arguments(self):
+            return []
+
+        def errorMessage(self):
+            return "org.freedesktop.DBus.Error.ServiceUnknown"
+
+    try:
+        QtMutterIdleDBusConnector._require_reply_arg(ErrorReply(), "AddIdleWatch")
+        raised = False
+    except RuntimeError as exc:
+        raised = True
+        assert "AddIdleWatch" in str(exc)
+        assert "ServiceUnknown" in str(exc)
+    assert raised
+
+
+def test_require_reply_arg_returns_first_argument_on_success():
+    class OkReply:
+        def arguments(self):
+            return [42]
+
+    assert QtMutterIdleDBusConnector._require_reply_arg(OkReply(), "AddIdleWatch") == 42

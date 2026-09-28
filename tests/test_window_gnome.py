@@ -1,4 +1,5 @@
-from timetrace.backends.window_gnome import GnomeShellExtensionBackend
+from timetrace.backends import window_gnome
+from timetrace.backends.window_gnome import GnomeShellExtensionBackend, RealGnomeExtensionInstaller
 
 
 class FakeInstaller:
@@ -50,6 +51,16 @@ def test_signal_triggers_callback_with_timestamp():
     assert len(events) == 1
     assert events[0][0] == "firefox"
     assert isinstance(events[0][2], int)
+
+
+def test_install_and_enable_returns_false_when_gnome_extensions_missing(tmp_path, monkeypatch):
+    def raise_missing_binary(*args, **kwargs):
+        raise FileNotFoundError("gnome-extensions not found")
+
+    monkeypatch.setattr(window_gnome.subprocess, "run", raise_missing_binary)
+    installer = RealGnomeExtensionInstaller(extensions_dir=tmp_path)
+
+    assert installer.install_and_enable() is False  # must not raise
 
 
 def test_stop_unsubscribes():

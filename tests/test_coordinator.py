@@ -1,4 +1,6 @@
 # tests/test_coordinator.py
+from timetrace.backends.idle_base import NullIdleBackend
+from timetrace.backends.window_base import NullActiveWindowBackend
 from timetrace.db import Store
 from timetrace.tracking.coordinator import TrackingCoordinator
 
@@ -44,6 +46,48 @@ def make_coordinator(tmp_path, clock_values):
         store, idle, window, idle_threshold_ms=5000, clock=lambda: next(clock)
     )
     return store, idle, window, coordinator
+
+
+class RaisingIdleBackend:
+    def start(self, threshold_ms, on_idle, on_resume):
+        raise RuntimeError("idle backend unavailable on this environment")
+
+
+class RaisingWindowBackend:
+    def start(self, on_window_changed):
+        raise RuntimeError("window backend unavailable on this environment")
+
+
+def test_start_survives_idle_backend_start_failure(tmp_path, capsys):
+    store = Store(tmp_path / "data.db")
+    window = FakeWindowBackend()
+    coordinator = TrackingCoordinator(
+        store, RaisingIdleBackend(), window, idle_threshold_ms=5000, clock=lambda: 1000
+    )
+
+    coordinator.start()  # must not raise
+
+    assert isinstance(coordinator._idle_backend, NullIdleBackend)
+    assert window.on_window_changed is not None  # window backend still armed
+    assert store.get_open_presence_interval() is not None
+    assert "idle backend failed to start" in capsys.readouterr().err
+    store.close()
+
+
+def test_start_survives_window_backend_start_failure(tmp_path, capsys):
+    store = Store(tmp_path / "data.db")
+    idle = FakeIdleBackend()
+    coordinator = TrackingCoordinator(
+        store, idle, RaisingWindowBackend(), idle_threshold_ms=5000, clock=lambda: 1000
+    )
+
+    coordinator.start()  # must not raise
+
+    assert isinstance(coordinator._window_backend, NullActiveWindowBackend)
+    assert idle.started_threshold_ms == 5000  # idle backend still armed
+    assert store.get_open_presence_interval() is not None
+    assert "window backend failed to start" in capsys.readouterr().err
+    store.close()
 
 
 def test_start_opens_active_presence_interval_and_arms_backends(tmp_path):

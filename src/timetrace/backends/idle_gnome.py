@@ -1,3 +1,4 @@
+import sys
 import time
 from typing import Callable, Protocol
 
@@ -42,15 +43,27 @@ class QtMutterIdleDBusConnector:
 
     def add_idle_watch(self, ms: int, callback: Callable[[], None]) -> int:
         reply = self._iface.call("AddIdleWatch", ms)
-        watch_id = int(reply.arguments()[0])
+        watch_id = int(self._require_reply_arg(reply, "AddIdleWatch"))
         self._callbacks[watch_id] = callback
         return watch_id
 
     def add_active_watch(self, callback: Callable[[], None]) -> int:
         reply = self._iface.call("AddUserActiveWatch")
-        watch_id = int(reply.arguments()[0])
+        watch_id = int(self._require_reply_arg(reply, "AddUserActiveWatch"))
         self._callbacks[watch_id] = callback
         return watch_id
+
+    @staticmethod
+    def _require_reply_arg(reply, method_name: str):
+        # QDBusInterface.call() returns an error reply (no arguments) instead
+        # of raising when the call fails -- e.g. org.gnome.Mutter.IdleMonitor
+        # not being present/reachable on this Mutter version. Indexing
+        # straight into .arguments() would raise an opaque IndexError; fail
+        # with a message that actually says what went wrong.
+        args = reply.arguments()
+        if not args:
+            raise RuntimeError(f"{method_name} failed: {reply.errorMessage()}")
+        return args[0]
 
     def remove_watch(self, watch_id: int) -> None:
         self._iface.call("RemoveWatch", watch_id)
@@ -83,7 +96,17 @@ class MutterIdleMonitorBackend:
         self._arm_idle_watch()
 
     def _arm_idle_watch(self) -> None:
-        self._idle_watch_id = self._connector.add_idle_watch(self._threshold_ms, self._handle_idle)
+        # Re-arming happens outside the guarded start() call, driven later by
+        # a fired watch -- an unhandled exception here would propagate out of
+        # a Qt signal handler, which PySide/PyQt treats as fatal. Losing idle
+        # tracking for the rest of the session beats crashing the whole app.
+        try:
+            self._idle_watch_id = self._connector.add_idle_watch(
+                self._threshold_ms, self._handle_idle
+            )
+        except Exception as exc:
+            print(f"timetrace: failed to re-arm idle watch, idle detection stopped: {exc}", file=sys.stderr)
+            self._idle_watch_id = None
 
     def _handle_idle(self) -> None:
         now_ts = int(time.time() * 1000)
@@ -92,7 +115,11 @@ class MutterIdleMonitorBackend:
         if self._idle_watch_id is not None:
             self._connector.remove_watch(self._idle_watch_id)
             self._idle_watch_id = None
-        self._active_watch_id = self._connector.add_active_watch(self._handle_resume)
+        try:
+            self._active_watch_id = self._connector.add_active_watch(self._handle_resume)
+        except Exception as exc:
+            print(f"timetrace: failed to arm active watch, idle detection stopped: {exc}", file=sys.stderr)
+            self._active_watch_id = None
 
     def _handle_resume(self) -> None:
         now_ts = int(time.time() * 1000)

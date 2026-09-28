@@ -9,7 +9,10 @@ def select_window_backend(desktop: DesktopEnv, session: SessionType) -> ActiveWi
     if desktop not in ("kde", "gnome"):
         return NullActiveWindowBackend()
     if session == "x11":
-        return X11EwmhActiveWindowBackend()
+        try:
+            return X11EwmhActiveWindowBackend()
+        except Exception:
+            return NullActiveWindowBackend()
     if session == "wayland" and desktop == "kde":
         try:
             return KWinScriptActiveWindowBackend()

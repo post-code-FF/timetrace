@@ -24,10 +24,17 @@ class RealGnomeExtensionInstaller:
         for name in ("metadata.json", "extension.js"):
             (target / name).write_bytes((src_dir / name).read_bytes())
 
-        result = subprocess.run(
-            ["gnome-extensions", "enable", EXTENSION_UUID],
-            capture_output=True,
-        )
+        try:
+            result = subprocess.run(
+                ["gnome-extensions", "enable", EXTENSION_UUID],
+                capture_output=True,
+            )
+        except OSError:
+            # "gnome-extensions" CLI missing, or the shell version this
+            # extension declares support for doesn't match the running
+            # GNOME Shell -- either way, fall back to no window tracking
+            # instead of raising, per RealGnomeExtensionInstaller's contract.
+            return False
         return result.returncode == 0
 
 

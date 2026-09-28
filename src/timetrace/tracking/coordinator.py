@@ -1,10 +1,11 @@
 # src/timetrace/tracking/coordinator.py
 import queue
+import sys
 import time
 from typing import Callable
 
-from timetrace.backends.idle_base import IdleBackend
-from timetrace.backends.window_base import ActiveWindowBackend
+from timetrace.backends.idle_base import IdleBackend, NullIdleBackend
+from timetrace.backends.window_base import ActiveWindowBackend, NullActiveWindowBackend
 from timetrace.db import Store
 
 
@@ -39,14 +40,28 @@ class TrackingCoordinator:
         self._store.open_presence_interval("active", now_ts)
         self._presence_state = "active"
 
-        self._idle_backend.start(
-            self._threshold_ms,
-            on_idle=lambda ts: self._queue.put(("idle", ts)),
-            on_resume=lambda ts: self._queue.put(("resume", ts)),
-        )
-        self._window_backend.start(
-            lambda rc, title, ts: self._queue.put(("window", rc, title, ts))
-        )
+        # A real backend's start() touches live D-Bus services, subprocesses, or
+        # window-system connections whose exact behavior varies across desktop
+        # environment versions in ways construction-time checks can't catch.
+        # Never let that take down the whole app before the window can even
+        # appear -- degrade to a Null backend and keep going.
+        try:
+            self._idle_backend.start(
+                self._threshold_ms,
+                on_idle=lambda ts: self._queue.put(("idle", ts)),
+                on_resume=lambda ts: self._queue.put(("resume", ts)),
+            )
+        except Exception as exc:
+            print(f"timetrace: idle backend failed to start, disabling it: {exc}", file=sys.stderr)
+            self._idle_backend = NullIdleBackend()
+
+        try:
+            self._window_backend.start(
+                lambda rc, title, ts: self._queue.put(("window", rc, title, ts))
+            )
+        except Exception as exc:
+            print(f"timetrace: window backend failed to start, disabling it: {exc}", file=sys.stderr)
+            self._window_backend = NullActiveWindowBackend()
 
     def update_idle_threshold(self, minutes: int) -> None:
         self._threshold_ms = minutes * 60_000
