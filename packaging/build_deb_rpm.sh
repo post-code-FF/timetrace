@@ -29,13 +29,13 @@ cp "$STAGE_DIR/usr/share/icons/hicolor/256x256/apps/timetrace.png" \
     "$STAGE_DIR/usr/share/pixmaps/timetrace.png"
 
 fpm -s dir -t deb -n timetrace -v "$VERSION" \
-    --description "Simplified ManicTime-alike time tracker for KDE and GNOME" \
+    --description "Time tracker for KDE and GNOME" \
     --license MIT \
     --url "https://github.com/<owner>/timetrace" \
     -C "$STAGE_DIR" -p "$OUT_DIR/timetrace_${VERSION}_amd64.deb" .
 
 fpm -s dir -t rpm -n timetrace -v "$VERSION" \
-    --description "Simplified ManicTime-alike time tracker for KDE and GNOME" \
+    --description "Time tracker for KDE and GNOME" \
     --license MIT \
     --url "https://github.com/<owner>/timetrace" \
     -C "$STAGE_DIR" -p "$OUT_DIR/timetrace-${VERSION}.x86_64.rpm" .

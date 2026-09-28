@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=TimeTrace
-Comment=Simplified ManicTime-alike time tracker
+Comment=Time tracker for KDE and GNOME
 Exec=/usr/bin/timetrace
 Icon=timetrace
 Categories=Utility;

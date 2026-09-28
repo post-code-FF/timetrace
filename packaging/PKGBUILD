@@ -2,7 +2,7 @@
 pkgname=timetrace
 pkgver=0.1.0
 pkgrel=1
-pkgdesc="Simplified ManicTime-alike time tracker for KDE and GNOME"
+pkgdesc="Time tracker for KDE and GNOME"
 arch=('x86_64')
 url="https://github.com/<owner>/timetrace"
 license=('MIT')
