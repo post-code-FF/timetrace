@@ -4,6 +4,8 @@ import sys
 import time
 from typing import Callable, Protocol
 
+from timetrace.subprocess_env import system_subprocess_env
+
 
 class MutterIdleDBusConnector(Protocol):
     def add_idle_watch(self, ms: int, callback: Callable[[], None]) -> int: ...
@@ -70,6 +72,7 @@ class QtMutterIdleDBusConnector:
             ],
             capture_output=True,
             text=True,
+            env=system_subprocess_env(),
         )
         if result.returncode != 0:
             raise RuntimeError(f"{method} failed: {result.stderr.strip()}")

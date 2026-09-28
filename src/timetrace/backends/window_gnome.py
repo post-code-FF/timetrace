@@ -4,6 +4,8 @@ from importlib import resources
 from pathlib import Path
 from typing import Callable, Protocol
 
+from timetrace.subprocess_env import system_subprocess_env
+
 EXTENSION_UUID = "timetrace@timetrace.app"
 
 
@@ -28,6 +30,7 @@ class RealGnomeExtensionInstaller:
             result = subprocess.run(
                 ["gnome-extensions", "enable", EXTENSION_UUID],
                 capture_output=True,
+                env=system_subprocess_env(),
             )
         except OSError:
             # "gnome-extensions" CLI missing, or the shell version this

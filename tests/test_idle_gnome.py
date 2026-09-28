@@ -185,6 +185,27 @@ def test_call_passes_explicitly_typed_gvariant_arguments(monkeypatch):
     assert "uint64 5000" in captured["argv"]
 
 
+def test_call_passes_system_subprocess_env(monkeypatch):
+    import subprocess
+
+    from timetrace.backends import idle_gnome
+
+    captured = {}
+
+    def fake_run(argv, **kwargs):
+        captured["kwargs"] = kwargs
+        return FakeCompletedProcess(0, stdout="(5,)\n")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(idle_gnome, "system_subprocess_env", lambda: {"sentinel": "1"})
+    connector = QtMutterIdleDBusConnector.__new__(QtMutterIdleDBusConnector)
+    connector._call("AddIdleWatch", "uint64 5000")
+    # gdbus must not inherit the frozen app's LD_LIBRARY_PATH, or it can pick
+    # up a bundled glib older than the system's and fail to resolve symbols
+    # the system gdbus binary expects (see subprocess_env.py).
+    assert captured["kwargs"]["env"] == {"sentinel": "1"}
+
+
 def test_parse_reply_uint_extracts_id_from_gvariant_tuple():
     assert QtMutterIdleDBusConnector._parse_reply_uint("(5,)", "AddIdleWatch") == 5
 

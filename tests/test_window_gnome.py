@@ -63,6 +63,26 @@ def test_install_and_enable_returns_false_when_gnome_extensions_missing(tmp_path
     assert installer.install_and_enable() is False  # must not raise
 
 
+def test_install_and_enable_passes_system_subprocess_env(tmp_path, monkeypatch):
+    captured = {}
+
+    def fake_run(argv, **kwargs):
+        captured["kwargs"] = kwargs
+
+        class Result:
+            returncode = 0
+
+        return Result()
+
+    monkeypatch.setattr(window_gnome.subprocess, "run", fake_run)
+    monkeypatch.setattr(window_gnome, "system_subprocess_env", lambda: {"sentinel": "1"})
+    installer = RealGnomeExtensionInstaller(extensions_dir=tmp_path)
+    installer.install_and_enable()
+    # gnome-extensions must not inherit the frozen app's LD_LIBRARY_PATH (see
+    # subprocess_env.py / the sibling fix in idle_gnome.py's gdbus call).
+    assert captured["kwargs"]["env"] == {"sentinel": "1"}
+
+
 def test_stop_unsubscribes():
     installer = FakeInstaller()
     client = FakeDBusClient()
