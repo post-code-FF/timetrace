@@ -110,3 +110,32 @@ def test_creating_store_creates_missing_parent_directory(tmp_path):
     store = Store(db_path)
     assert db_path.exists()
     store.close()
+
+
+def test_sleep_state_allowed_on_a_database_created_before_it_existed(tmp_path):
+    import sqlite3
+
+    db_path = tmp_path / "data.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript(
+        """
+        CREATE TABLE presence_intervals (
+            id INTEGER PRIMARY KEY,
+            state TEXT NOT NULL CHECK(state IN ('active', 'idle')),
+            start_ts INTEGER NOT NULL,
+            end_ts INTEGER
+        );
+        """
+    )
+    conn.execute(
+        "INSERT INTO presence_intervals (state, start_ts, end_ts) VALUES ('active', 1000, 2000)"
+    )
+    conn.commit()
+    conn.close()
+
+    store = Store(db_path)  # must migrate the old CHECK constraint on open
+    store.open_presence_interval("sleep", 3000)  # must not raise
+
+    rows = store.presence_intervals_for_day(0, 10_000, now_ts=3000)
+    assert {r.state for r in rows} == {"active", "sleep"}
+    store.close()

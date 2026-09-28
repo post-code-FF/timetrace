@@ -5,6 +5,7 @@ import time
 from typing import Callable
 
 from timetrace.backends.idle_base import IdleBackend, NullIdleBackend
+from timetrace.backends.sleep_monitor import NullSleepMonitor, SleepBackend
 from timetrace.backends.window_base import ActiveWindowBackend, NullActiveWindowBackend
 from timetrace.db import Store
 
@@ -21,10 +22,12 @@ class TrackingCoordinator:
         window_backend: ActiveWindowBackend,
         idle_threshold_ms: int,
         clock: Callable[[], int] | None = None,
+        sleep_backend: SleepBackend | None = None,
     ) -> None:
         self._store = store
         self._idle_backend = idle_backend
         self._window_backend = window_backend
+        self._sleep_backend = sleep_backend or NullSleepMonitor()
         self._threshold_ms = idle_threshold_ms
         self._clock = clock or _default_clock
         self._queue: queue.Queue = queue.Queue()
@@ -63,6 +66,15 @@ class TrackingCoordinator:
             print(f"timetrace: window backend failed to start, disabling it: {exc}", file=sys.stderr)
             self._window_backend = NullActiveWindowBackend()
 
+        try:
+            self._sleep_backend.start(
+                on_sleep=lambda ts: self._queue.put(("sleep", ts)),
+                on_wake=lambda ts: self._queue.put(("wake", ts)),
+            )
+        except Exception as exc:
+            print(f"timetrace: sleep monitor failed to start, disabling it: {exc}", file=sys.stderr)
+            self._sleep_backend = NullSleepMonitor()
+
     def update_idle_threshold(self, minutes: int) -> None:
         self._threshold_ms = minutes * 60_000
         self._idle_backend.update_threshold(self._threshold_ms)
@@ -81,6 +93,10 @@ class TrackingCoordinator:
             self._on_idle(event[1])
         elif kind == "resume":
             self._on_resume(event[1])
+        elif kind == "sleep":
+            self._on_sleep(event[1])
+        elif kind == "wake":
+            self._on_resume(event[1])
         elif kind == "window":
             self._on_window_changed(event[1], event[2], event[3])
 
@@ -91,6 +107,14 @@ class TrackingCoordinator:
         self._store.close_open_presence_interval(ts)
         self._store.open_presence_interval("idle", ts)
         self._presence_state = "idle"
+
+    def _on_sleep(self, ts: int) -> None:
+        if self._open_app_resource_class is not None:
+            self._store.close_open_app_interval(ts)
+            self._open_app_resource_class = None
+        self._store.close_open_presence_interval(ts)
+        self._store.open_presence_interval("sleep", ts)
+        self._presence_state = "sleep"
 
     def _on_resume(self, ts: int) -> None:
         self._store.close_open_presence_interval(ts)
@@ -116,6 +140,7 @@ class TrackingCoordinator:
         now_ts = self._clock()
         self._idle_backend.stop()
         self._window_backend.stop()
+        self._sleep_backend.stop()
         if self._open_app_resource_class is not None:
             self._store.close_open_app_interval(now_ts)
             self._open_app_resource_class = None

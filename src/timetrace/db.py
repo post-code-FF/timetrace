@@ -7,7 +7,7 @@ from pathlib import Path
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS presence_intervals (
     id INTEGER PRIMARY KEY,
-    state TEXT NOT NULL CHECK(state IN ('active', 'idle')),
+    state TEXT NOT NULL CHECK(state IN ('active', 'idle', 'sleep')),
     start_ts INTEGER NOT NULL,
     end_ts INTEGER
 );
@@ -47,11 +47,39 @@ def day_bounds_ts(day: date, tz: tzinfo) -> tuple[int, int]:
     return start_ts, end_ts
 
 
+def _migrate_presence_state_constraint(conn: sqlite3.Connection) -> None:
+    """Widen presence_intervals.state's CHECK to allow 'sleep' on databases
+    created before that state existed. SQLite can't ALTER a CHECK
+    constraint directly, so rebuild the table under a fresh definition and
+    copy the existing rows across."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='presence_intervals'"
+    ).fetchone()
+    if row is None or row[0] is None or "'sleep'" in row[0]:
+        return  # table doesn't exist yet (fresh db), or already migrated
+    conn.executescript(
+        """
+        ALTER TABLE presence_intervals RENAME TO presence_intervals_old;
+        CREATE TABLE presence_intervals (
+            id INTEGER PRIMARY KEY,
+            state TEXT NOT NULL CHECK(state IN ('active', 'idle', 'sleep')),
+            start_ts INTEGER NOT NULL,
+            end_ts INTEGER
+        );
+        INSERT INTO presence_intervals (id, state, start_ts, end_ts)
+            SELECT id, state, start_ts, end_ts FROM presence_intervals_old;
+        DROP TABLE presence_intervals_old;
+        """
+    )
+    conn.commit()
+
+
 class Store:
     def __init__(self, db_path: str | Path) -> None:
         db_path = Path(db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(db_path)
+        _migrate_presence_state_constraint(self._conn)
         self._conn.executescript(SCHEMA)
         self._conn.commit()
 

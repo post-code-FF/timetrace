@@ -27,6 +27,7 @@ def build_app(argv: list[str]):
 
     from timetrace import paths, theme
     from timetrace.backends.idle_factory import select_idle_backend
+    from timetrace.backends.sleep_monitor import NullSleepMonitor, SleepMonitor
     from timetrace.backends.window_factory import select_window_backend
     from timetrace.config import load_config
     from timetrace.db import Store
@@ -69,9 +70,17 @@ def build_app(argv: list[str]):
     session = detect_session_type()
     idle_backend = select_idle_backend(desktop, session)
     window_backend = select_window_backend(desktop, session)
+    try:
+        sleep_backend = SleepMonitor()
+    except Exception:
+        sleep_backend = NullSleepMonitor()
 
     coordinator = TrackingCoordinator(
-        store, idle_backend, window_backend, idle_threshold_ms=config.idle_threshold_minutes * 60_000
+        store,
+        idle_backend,
+        window_backend,
+        idle_threshold_ms=config.idle_threshold_minutes * 60_000,
+        sleep_backend=sleep_backend,
     )
     coordinator.start()
 

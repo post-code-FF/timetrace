@@ -48,6 +48,32 @@ def make_coordinator(tmp_path, clock_values):
     return store, idle, window, coordinator
 
 
+class FakeSleepBackend:
+    def __init__(self):
+        self.on_sleep = None
+        self.on_wake = None
+        self.stopped = False
+
+    def start(self, on_sleep, on_wake):
+        self.on_sleep = on_sleep
+        self.on_wake = on_wake
+
+    def stop(self):
+        self.stopped = True
+
+
+def make_coordinator_with_sleep(tmp_path, clock_values):
+    store = Store(tmp_path / "data.db")
+    idle = FakeIdleBackend()
+    window = FakeWindowBackend()
+    sleep = FakeSleepBackend()
+    clock = iter(clock_values)
+    coordinator = TrackingCoordinator(
+        store, idle, window, idle_threshold_ms=5000, clock=lambda: next(clock), sleep_backend=sleep
+    )
+    return store, idle, window, sleep, coordinator
+
+
 class RaisingIdleBackend:
     def start(self, threshold_ms, on_idle, on_resume):
         raise RuntimeError("idle backend unavailable on this environment")
@@ -56,6 +82,11 @@ class RaisingIdleBackend:
 class RaisingWindowBackend:
     def start(self, on_window_changed):
         raise RuntimeError("window backend unavailable on this environment")
+
+
+class RaisingSleepBackend:
+    def start(self, on_sleep, on_wake):
+        raise RuntimeError("sleep monitor unavailable on this environment")
 
 
 def test_start_survives_idle_backend_start_failure(tmp_path, capsys):
@@ -87,6 +118,30 @@ def test_start_survives_window_backend_start_failure(tmp_path, capsys):
     assert idle.started_threshold_ms == 5000  # idle backend still armed
     assert store.get_open_presence_interval() is not None
     assert "window backend failed to start" in capsys.readouterr().err
+    store.close()
+
+
+def test_start_survives_sleep_backend_start_failure(tmp_path, capsys):
+    from timetrace.backends.sleep_monitor import NullSleepMonitor
+
+    store = Store(tmp_path / "data.db")
+    idle = FakeIdleBackend()
+    window = FakeWindowBackend()
+    coordinator = TrackingCoordinator(
+        store,
+        idle,
+        window,
+        idle_threshold_ms=5000,
+        clock=lambda: 1000,
+        sleep_backend=RaisingSleepBackend(),
+    )
+
+    coordinator.start()  # must not raise
+
+    assert isinstance(coordinator._sleep_backend, NullSleepMonitor)
+    assert idle.started_threshold_ms == 5000  # idle backend still armed
+    assert window.on_window_changed is not None  # window backend still armed
+    assert "sleep monitor failed to start" in capsys.readouterr().err
     store.close()
 
 
@@ -167,6 +222,65 @@ def test_idle_closes_presence_and_app_intervals(tmp_path):
     store.close()
 
 
+def test_sleep_closes_presence_and_app_intervals(tmp_path):
+    store, idle, window, sleep, coordinator = make_coordinator_with_sleep(
+        tmp_path, [1000, 2000, 6000]
+    )
+    coordinator.start()
+    window.on_window_changed("firefox", "Mozilla Firefox", 2000)
+    coordinator.process_pending_events()
+
+    sleep.on_sleep(6000)
+    coordinator.process_pending_events()
+
+    assert store.get_open_app_interval() is None
+    presence = store.get_open_presence_interval()
+    assert presence.state == "sleep"
+    assert presence.start_ts == 6000
+    store.close()
+
+
+def test_wake_reopens_active_presence_and_last_known_app(tmp_path):
+    store, idle, window, sleep, coordinator = make_coordinator_with_sleep(
+        tmp_path, [1000, 2000, 6000, 9000]
+    )
+    coordinator.start()
+    window.on_window_changed("firefox", "Mozilla Firefox", 2000)
+    coordinator.process_pending_events()
+    sleep.on_sleep(6000)
+    coordinator.process_pending_events()
+
+    sleep.on_wake(9000)
+    coordinator.process_pending_events()
+
+    presence = store.get_open_presence_interval()
+    assert presence.state == "active"
+    assert presence.start_ts == 9000
+
+    open_app = store.get_open_app_interval()
+    assert open_app is not None
+    assert open_app.resource_class == "firefox"
+    assert open_app.start_ts == 9000
+    store.close()
+
+
+def test_sleep_while_already_idle_closes_idle_presence_interval(tmp_path):
+    store, idle, window, sleep, coordinator = make_coordinator_with_sleep(
+        tmp_path, [1000, 6000, 7000]
+    )
+    coordinator.start()
+    idle.on_idle(6000)
+    coordinator.process_pending_events()
+
+    sleep.on_sleep(7000)
+    coordinator.process_pending_events()
+
+    presence = store.get_open_presence_interval()
+    assert presence.state == "sleep"
+    assert presence.start_ts == 7000
+    store.close()
+
+
 def test_resume_reopens_app_interval_for_last_known_window_without_new_event(tmp_path):
     store, idle, window, coordinator = make_coordinator(tmp_path, [1000, 2000, 6000, 9000])
     coordinator.start()
@@ -227,6 +341,14 @@ def test_stop_stops_backends_and_closes_open_intervals(tmp_path):
     assert window.stopped is True
     assert store.get_open_presence_interval() is None
     assert store.get_open_app_interval() is None
+    store.close()
+
+
+def test_stop_stops_sleep_backend(tmp_path):
+    store, idle, window, sleep, coordinator = make_coordinator_with_sleep(tmp_path, [1000, 5000])
+    coordinator.start()
+    coordinator.stop()
+    assert sleep.stopped is True
     store.close()
 
 

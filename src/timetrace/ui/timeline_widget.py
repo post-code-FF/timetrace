@@ -1,9 +1,10 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Callable
 
 from PySide6.QtCore import QRectF, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QToolTip, QWidget
 
 TRACK_HEIGHT_PX = 96
 MIN_SEGMENT_WIDTH_PX = 4.0
@@ -55,6 +56,11 @@ class TimelineTrackWidget(QWidget):
         self._day_end_ts = 1
         self._current_time_ts: int | None = None
         self._hovered_resource_class: str | None = None
+        self._segment_label_resolver: Callable[[str], str] | None = None
+
+    def set_segment_label_resolver(self, resolver: Callable[[str], str] | None) -> None:
+        """Opt-in tooltip: when set, hovering a segment shows resolver(resource_class)."""
+        self._segment_label_resolver = resolver
 
     def set_intervals(
         self,
@@ -83,8 +89,18 @@ class TimelineTrackWidget(QWidget):
                 break
         self._set_hovered(hovered)
 
+        if self._segment_label_resolver is not None:
+            if hovered is not None:
+                QToolTip.showText(
+                    event.globalPosition().toPoint(), self._segment_label_resolver(hovered), self
+                )
+            else:
+                QToolTip.hideText()
+
     def leaveEvent(self, event) -> None:
         self._set_hovered(None)
+        if self._segment_label_resolver is not None:
+            QToolTip.hideText()
         super().leaveEvent(event)
 
     def _set_hovered(self, resource_class: str | None) -> None:

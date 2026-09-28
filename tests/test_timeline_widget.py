@@ -109,3 +109,26 @@ def test_leaving_widget_emits_none(qtbot):
     widget.segmentHovered.connect(received.append)
     widget.leaveEvent(QEvent(QEvent.Type.Leave))
     assert received == [None]
+
+
+def test_segment_label_resolver_is_called_with_hovered_resource_class(qtbot):
+    widget = TimelineTrackWidget()
+    widget.resize(100, 28)
+    qtbot.addWidget(widget)
+    widget.set_intervals([(0, 1000, (0, 255, 0), "idle")], day_start_ts=0, day_end_ts=1000)
+
+    resolved = []
+    widget.set_segment_label_resolver(lambda state: resolved.append(state) or f"label:{state}")
+
+    widget.mouseMoveEvent(_mouse_move_event(10, 5))
+    assert resolved == ["idle"]
+
+
+def test_without_resolver_hovering_does_not_raise(qtbot):
+    widget = TimelineTrackWidget()
+    widget.resize(100, 28)
+    qtbot.addWidget(widget)
+    widget.set_intervals([(0, 1000, (0, 255, 0), "firefox")], day_start_ts=0, day_end_ts=1000)
+
+    widget.mouseMoveEvent(_mouse_move_event(10, 5))  # must not raise with no resolver set
+    widget.leaveEvent(QEvent(QEvent.Type.Leave))  # must not raise either

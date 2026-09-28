@@ -11,7 +11,8 @@ from timetrace.db import Store, day_bounds_ts
 from timetrace.ui.date_nav import DateNavBar
 from timetrace.ui.timeline_widget import TimelineTrackWidget
 
-PRESENCE_COLORS = {"active": (46, 204, 64), "idle": (219, 68, 55)}
+PRESENCE_COLORS = {"active": (46, 204, 64), "idle": (219, 68, 55), "sleep": (219, 68, 55)}
+PRESENCE_LABELS = {"active": "Активен", "idle": "Простой", "sleep": "Спящий режим"}
 
 
 class MainWindow(QMainWindow):
@@ -57,6 +58,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         self.app_track.segmentHovered.connect(self.app_list.set_highlighted_resource_class)
+        self.presence_track.set_segment_label_resolver(
+            lambda state: PRESENCE_LABELS.get(state, state)
+        )
 
         self._date_nav.dateChanged.connect(lambda _d: self.refresh())
         self.refresh()
@@ -69,7 +73,7 @@ class MainWindow(QMainWindow):
 
         presence_rows = self._store.presence_intervals_for_day(day_start_ts, day_end_ts, now_ts)
         presence_tuples = [
-            (r.start_ts, r.end_ts, PRESENCE_COLORS.get(r.state, (128, 128, 128)))
+            (r.start_ts, r.end_ts, PRESENCE_COLORS.get(r.state, (128, 128, 128)), r.state)
             for r in presence_rows
         ]
 
