@@ -7,10 +7,17 @@ arch=('x86_64')
 url="https://github.com/<owner>/timetrace"
 license=('MIT')
 depends=()
+makedepends=('imagemagick')
 source_x86_64=("timetrace-${pkgver}-x86_64.bin::https://github.com/<owner>/timetrace/releases/download/v${pkgver}/timetrace")
 sha256sums_x86_64=('SKIP')
 
 package() {
     install -Dm755 "${srcdir}/timetrace-${pkgver}-x86_64.bin" "${pkgdir}/usr/bin/timetrace"
     install -Dm644 "${startdir}/timetrace.desktop" "${pkgdir}/usr/share/applications/timetrace.desktop"
+
+    install -d "${pkgdir}/usr/share/icons/hicolor/256x256/apps" "${pkgdir}/usr/share/pixmaps"
+    convert "${startdir}/icon.png" -resize 256x256 \
+        "${pkgdir}/usr/share/icons/hicolor/256x256/apps/timetrace.png"
+    install -Dm644 "${pkgdir}/usr/share/icons/hicolor/256x256/apps/timetrace.png" \
+        "${pkgdir}/usr/share/pixmaps/timetrace.png"
 }
