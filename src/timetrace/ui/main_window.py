@@ -72,14 +72,25 @@ class MainWindow(QMainWindow):
             (r.start_ts, r.end_ts, PRESENCE_COLORS.get(r.state, (128, 128, 128)))
             for r in presence_rows
         ]
-        self.presence_track.set_intervals(presence_tuples, day_start_ts, day_end_ts)
+
+        # Render only the span actually covered by tracked data (first event of
+        # the day through the last), not the full midnight-to-midnight day --
+        # otherwise most of the track is wasted gray for not-yet-lived time
+        # today, or time before tracking started that day.
+        if presence_rows:
+            render_start_ts = min(r.start_ts for r in presence_rows)
+            render_end_ts = max(r.end_ts for r in presence_rows)
+        else:
+            render_start_ts = render_end_ts = day_start_ts
+
+        self.presence_track.set_intervals(presence_tuples, render_start_ts, render_end_ts)
 
         app_rows = self._store.app_intervals_for_day(day_start_ts, day_end_ts, now_ts)
         app_tuples = [
             (r.start_ts, r.end_ts, color_for_resource_class(r.resource_class), r.resource_class)
             for r in app_rows
         ]
-        self.app_track.set_intervals(app_tuples, day_start_ts, day_end_ts)
+        self.app_track.set_intervals(app_tuples, render_start_ts, render_end_ts)
 
         is_today = selected_day == now.date()
         self.presence_track.set_current_time_ts(now_ts if is_today else None)
