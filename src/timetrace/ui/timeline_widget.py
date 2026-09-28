@@ -5,7 +5,7 @@ from PySide6.QtCore import QRectF, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
-TRACK_HEIGHT_PX = 28
+TRACK_HEIGHT_PX = 64
 
 
 @dataclass(frozen=True)
