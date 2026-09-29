@@ -11,7 +11,7 @@ def test_enable_creates_desktop_file_with_exec(tmp_path):
     set_autostart_enabled(True, autostart_path=path, exec_path="/usr/bin/timetrace")
     assert path.exists()
     content = path.read_text()
-    assert "Exec=/usr/bin/timetrace" in content
+    assert "Exec=/usr/bin/timetrace --minimized" in content
     assert "[Desktop Entry]" in content
     assert is_autostart_enabled(path) is True
 

@@ -24,7 +24,7 @@ def set_autostart_enabled(
         "[Desktop Entry]\n"
         "Type=Application\n"
         "Name=TimeTrace\n"
-        f"Exec={exec_path}\n"
+        f"Exec={exec_path} --minimized\n"
         "X-GNOME-Autostart-enabled=true\n"
     )
     path.write_text(content)

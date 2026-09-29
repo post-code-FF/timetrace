@@ -142,6 +142,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     if argv[:1] == ["--version"]:
         print(f"timetrace {__version__}")
         return 0
+    start_minimized = "--minimized" in argv
+    argv = [a for a in argv if a != "--minimized"]
 
     app, window, coordinator, tray, quit_app = build_app(sys.argv[:1] + argv)
     if window is None:
@@ -159,7 +161,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     signal.signal(signal.SIGTERM, lambda *_: quit_app())
     signal.signal(signal.SIGINT, lambda *_: quit_app())
 
-    window.show()
+    if not start_minimized:
+        window.show()
     return app.exec()
 
 
