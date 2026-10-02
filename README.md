@@ -25,7 +25,7 @@
 Готовые пакеты — на странице [Releases](https://github.com/post-code-FF/timetrace/releases):
 
 - `.deb` / `.rpm` — через `dpkg -i` / `rpm -i` (или менеджер пакетов дистрибутива);
-- Arch Linux — `PKGBUILD` в `packaging/PKGBUILD` (`makepkg -si`), качает бинарник из GitHub Releases;
+- Arch Linux — `PKGBUILD` в `packaging/PKGBUILD` (пакет `timetrace-git`, `makepkg -si`; назван так, чтобы не конфликтовать с одноимённым AUR-пакетом `timetrace` — это другая программа), качает бинарник из GitHub Releases;
 - отдельный бинарник `timetrace` — скачать и положить в `$PATH` (например, `/usr/bin/timetrace`).
 
 ### Из исходников
