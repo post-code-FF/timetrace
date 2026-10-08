@@ -2,7 +2,7 @@
 pkgname=timetrace-git
 pkgver=0.1.1
 pkgrel=1
-pkgdesc="Time tracker for Linux: X11 on any desktop, GNOME and KDE on Wayland"
+pkgdesc="Time tracker for Linux: any desktop on X11, KDE & GNOME on Wayland"
 arch=('x86_64')
 url="https://github.com/post-code-FF/timetrace"
 license=('MIT')

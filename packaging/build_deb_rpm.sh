@@ -32,13 +32,13 @@ cp "$STAGE_DIR/usr/share/icons/hicolor/256x256/apps/timetrace.png" \
     "$STAGE_DIR/usr/share/pixmaps/timetrace.png"
 
 fpm -s dir -t deb -n timetrace -v "$VERSION" \
-    --description "Time tracker for Linux: X11 on any desktop, GNOME and KDE on Wayland" \
+    --description "Time tracker for Linux: any desktop on X11, KDE & GNOME on Wayland" \
     --license MIT \
     --url "https://github.com/post-code-FF/timetrace" \
     -C "$STAGE_DIR" -p "$OUT_DIR/timetrace_${VERSION}_${VARIANT}_amd64.deb" .
 
 fpm -s dir -t rpm -n timetrace -v "$VERSION" \
-    --description "Time tracker for Linux: X11 on any desktop, GNOME and KDE on Wayland" \
+    --description "Time tracker for Linux: any desktop on X11, KDE & GNOME on Wayland" \
     --license MIT \
     --url "https://github.com/post-code-FF/timetrace" \
     -C "$STAGE_DIR" -p "$OUT_DIR/timetrace-${VERSION}.${VARIANT}.x86_64.rpm" .

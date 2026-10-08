@@ -57,3 +57,23 @@ def test_build_app_skips_tray_when_system_tray_unavailable(tmp_path, monkeypatch
 
     coordinator.stop()
     app.quit()
+
+
+def test_build_app_runs_as_primary_instance_without_session_bus(tmp_path, monkeypatch):
+    # Minimal X11 setups (startx + a bare window manager) often have no D-Bus
+    # session bus. registerService() then fails, which must not be mistaken
+    # for "another instance already owns the name".
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+    monkeypatch.setenv("XDG_CURRENT_DESKTOP", "")
+    monkeypatch.setenv("XDG_SESSION_TYPE", "")
+    monkeypatch.setattr(QDBusConnection, "isConnected", lambda self: False)
+    monkeypatch.setattr(QDBusConnection, "registerService", lambda self, name: False)
+
+    app, window, coordinator, tray, quit_app = build_app([])
+
+    assert window is not None
+    assert coordinator is not None
+
+    coordinator.stop()
+    app.quit()

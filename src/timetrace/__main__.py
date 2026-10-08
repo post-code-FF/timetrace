@@ -41,7 +41,10 @@ def build_app(argv: list[str]):
     app.setQuitOnLastWindowClosed(False)
 
     bus = QDBusConnection.sessionBus()
-    is_primary_instance = bus.registerService("org.timetrace.App")
+    # Without a session bus (e.g. startx + a bare window manager) nobody else
+    # can own the name either, so a failed registration only means "another
+    # instance" when we are actually connected.
+    is_primary_instance = not bus.isConnected() or bus.registerService("org.timetrace.App")
     if not is_primary_instance:
         iface = QDBusInterface("org.timetrace.App", "/App", "", bus)
         iface.call("Raise")
