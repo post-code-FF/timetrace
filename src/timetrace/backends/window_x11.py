@@ -21,6 +21,9 @@ class RealX11Client:
         self._net_wm_pid = self._display.intern_atom("_NET_WM_PID")
         self._wm_class_atom = self._display.intern_atom("WM_CLASS")
         self._root.change_attributes(event_mask=X.PropertyChangeMask)
+        # change_attributes only queues the request; without a round trip the
+        # event mask never reaches the server and no change events ever arrive.
+        self._display.sync()
 
     def wait_for_active_window_change(self, timeout_s: float) -> bool:
         import select
@@ -65,6 +68,12 @@ class X11EwmhActiveWindowBackend:
 
         def loop() -> None:
             try:
+                try:
+                    info = self._client.get_active_window_info()
+                    if info is not None:
+                        on_window_changed(info[0], info[1], int(time.time() * 1000))
+                except Exception:
+                    pass
                 while not self._stop_event.is_set():
                     try:
                         changed = self._client.wait_for_active_window_change(0.5)

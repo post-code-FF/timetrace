@@ -5,9 +5,9 @@ from timetrace.backends.idle_kde_wayland import WaylandExtIdleNotifyBackend
 from timetrace.backends.idle_x11 import X11ScreenSaverIdleBackend
 
 
-def test_x11_session_any_supported_desktop_uses_screensaver_backend():
-    assert isinstance(select_idle_backend("kde", "x11"), X11ScreenSaverIdleBackend)
-    assert isinstance(select_idle_backend("gnome", "x11"), X11ScreenSaverIdleBackend)
+def test_x11_session_any_desktop_uses_screensaver_backend():
+    for desktop in ("kde", "gnome", "other"):
+        assert isinstance(select_idle_backend(desktop, "x11"), X11ScreenSaverIdleBackend)
 
 
 def test_gnome_wayland_uses_mutter_backend():
@@ -24,8 +24,7 @@ def test_kde_wayland_uses_ext_idle_notify_backend():
     assert isinstance(select_idle_backend("kde", "wayland"), WaylandExtIdleNotifyBackend)
 
 
-def test_unsupported_desktop_uses_null_backend():
-    assert isinstance(select_idle_backend("other", "x11"), NullIdleBackend)
+def test_other_desktop_on_wayland_uses_null_backend():
     assert isinstance(select_idle_backend("other", "wayland"), NullIdleBackend)
 
 

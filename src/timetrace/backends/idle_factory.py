@@ -6,8 +6,6 @@ from timetrace.env_detect import DesktopEnv, SessionType
 
 
 def select_idle_backend(desktop: DesktopEnv, session: SessionType) -> IdleBackend:
-    if desktop not in ("kde", "gnome"):
-        return NullIdleBackend()
     if session == "x11":
         return X11ScreenSaverIdleBackend()
     if session == "wayland" and desktop == "gnome":

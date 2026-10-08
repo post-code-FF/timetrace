@@ -16,32 +16,29 @@ ImportError: /lib64/libm.so.6: version `GLIBC_2.44' not found
 
 ## Решение
 
-Собирать `timetrace` не на хосте, а внутри Docker-контейнера на Debian 12
-(bookworm, glibc 2.36) — она достаточно старая, чтобы бинарник запускался на
-любой актуальной Fedora/Debian/Ubuntu, и достаточно новая для PySide6/Qt6
-(wheels ориентированы на manylinux_2_28+).
+Собирать `timetrace` не на хосте, а внутри Docker-контейнеров на Ubuntu
+20.04 (`legacy`, glibc 2.31), 22.04 (`standard`, 2.35) и 24.04 (`modern`, 2.39).
+Самый старый вариант запускается на системах с glibc 2.31+, а самый новый
+бандлит свежие `libstdc++` и др., которые не конфликтуют с системными
+библиотеками на rolling-дистрибутивах. Таблица «вариант → ОС» — в корневом README.
+`pywayland` собирается из исходников (`--no-binary`), так как его колесо
+на PyPI требует glibc 2.34+.
 
 ```bash
-./packaging/build_in_docker.sh
+./packaging/build_in_docker.sh            # все варианты
+./packaging/build_in_docker.sh legacy     # один вариант
 ```
 
 Скрипт соберёт образ `timetrace-build`, прогонит PyInstaller внутри него и
-скопирует результат в `packaging/dist/timetrace` — дальше `build_deb_rpm.sh`
+скопирует результат в `packaging/dist/timetrace-<вариант>` — дальше `build_deb_rpm.sh`
 работает без изменений.
 
-## Важно: не проверено в этой сессии
+## Проверка
 
-В песочнице, где выполнялась эта задача, у Docker-контейнеров нет доступа к
-DNS/сети (подтверждено: `apt-get update` внутри контейнера не резолвит
-`deb.debian.org` даже с `--network host`), хотя у хоста сеть есть. Это
-ограничение конкретной среды выполнения, а не Dockerfile. Поэтому
-`Dockerfile` и `build_in_docker.sh` не были прогнаны до конца — запустите
-`./packaging/build_in_docker.sh` на обычной машине (или в CI) и, если
-`apt-get`/`pip install` упадут на каком-то пакете, добавьте недостающую
-зависимость в список в `Dockerfile`.
+Все три варианта проверены запуском (`--help`, `QT_QPA_PLATFORM=offscreen`) в контейнерах Ubuntu 20.04/22.04/24.04, Debian 11/12/13, Fedora и Arch. Реальную работу под X11/Wayland и трей в контейнерах проверить нельзя.
 
 После сборки стоит проверить сам бинарник:
 
 ```bash
-docker run --rm -v "$PWD/packaging/dist:/dist" debian:12-slim /dist/timetrace --help
+docker run --rm -v "$PWD/packaging/dist:/dist" ubuntu:22.04 /dist/timetrace-standard --help
 ```

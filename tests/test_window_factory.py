@@ -6,9 +6,9 @@ from timetrace.backends.window_kwin import KWinScriptActiveWindowBackend
 from timetrace.backends.window_x11 import X11EwmhActiveWindowBackend
 
 
-def test_x11_session_any_supported_desktop_uses_ewmh_backend():
-    assert isinstance(select_window_backend("kde", "x11"), X11EwmhActiveWindowBackend)
-    assert isinstance(select_window_backend("gnome", "x11"), X11EwmhActiveWindowBackend)
+def test_x11_session_any_desktop_uses_ewmh_backend():
+    for desktop in ("kde", "gnome", "other"):
+        assert isinstance(select_window_backend(desktop, "x11"), X11EwmhActiveWindowBackend)
 
 
 def test_x11_construction_failure_falls_back_to_null_backend(monkeypatch):
@@ -27,6 +27,5 @@ def test_gnome_wayland_uses_shell_extension_backend():
     assert isinstance(select_window_backend("gnome", "wayland"), GnomeShellExtensionBackend)
 
 
-def test_unsupported_desktop_uses_null_backend():
-    assert isinstance(select_window_backend("other", "x11"), NullActiveWindowBackend)
+def test_other_desktop_on_wayland_uses_null_backend():
     assert isinstance(select_window_backend("other", "wayland"), NullActiveWindowBackend)

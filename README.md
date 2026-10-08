@@ -1,6 +1,6 @@
 # TimeTrace
 
-Трекер времени для KDE и GNOME (Linux). Показывает, в каких приложениях и окнах вы провели день, отслеживает простой (idle) и переходы в спящий режим, живёт в системном трее.
+Трекер времени для Linux. Работает на **любом десктопном окружении и оконном менеджере под X11** (Cinnamon, XFCE, MATE, i3, openbox и др.), а под Wayland — в GNOME и KDE. Показывает, в каких приложениях и окнах вы провели день, отслеживает простой (idle) и переходы в спящий режим, живёт в системном трее.
 
 ## Возможности
 
@@ -18,7 +18,9 @@
 |-------------------|------------------------------|------------------------------|
 | GNOME / Wayland   | GNOME IdleMonitor (D-Bus)    | GNOME Shell extension        |
 | KDE / Wayland      | `ext-idle-notify-v1`         | KWin script                  |
-| X11 (любое DE)     | XScreenSaver extension       | X11 (`_NET_ACTIVE_WINDOW`)   |
+| X11 (любое DE/WM)  | XScreenSaver extension       | X11 (`_NET_ACTIVE_WINDOW`)   |
+
+Под X11 приложение работает на любом окружении и оконном менеджере, который поддерживает EWMH (`_NET_ACTIVE_WINDOW`) — это практически все современные. Wayland поддерживается только в GNOME и KDE; в остальных Wayland-сессиях (Sway, Hyprland и т. п.) трекинг не работает.
 
 ## Установка
 
@@ -52,7 +54,7 @@ python -m timetrace
 
 Структура проекта:
 
-- `src/timetrace/backends/` — бэкенды простоя/активного окна/сна для X11, GNOME, KDE Wayland;
+- `src/timetrace/backends/` — бэкенды простоя/активного окна/сна для X11 (любое DE/WM), GNOME Wayland, KDE Wayland;
 - `src/timetrace/tracking/` — координатор, склеивающий события бэкендов в записи БД;
 - `src/timetrace/ui/` — главное окно, таймлайн, список приложений, трей, диалог настроек;
 - `src/timetrace/assets/` — GNOME Shell extension и KWin script, устанавливаемые бэкендами активного окна;
@@ -62,8 +64,20 @@ python -m timetrace
 
 См. скрипты в `packaging/`:
 
-- `packaging/build_in_docker.sh` — собирает бинарник `timetrace` в Docker-контейнере на Debian 12 (совместимость по glibc с более старыми дистрибутивами);
-- `packaging/build_deb_rpm.sh` — упаковывает собранный бинарник в `.deb` и `.rpm` через [`fpm`](https://github.com/jordansissel/fpm).
+- `packaging/build_in_docker.sh [вариант...]` — собирает бинарники `timetrace-<вариант>` в Docker-контейнерах (без аргументов — все три);
+- `packaging/build_deb_rpm.sh [вариант]` — упаковывает выбранный бинарник в `.deb` и `.rpm` через [`fpm`](https://github.com/jordansissel/fpm).
+
+### Какой вариант выбрать
+
+Бинарник требует glibc не новее той, что на машине сборки, поэтому собирается в трёх вариантах:
+
+| Вариант | База сборки | Минимальная glibc | Подходит для |
+|---|---|---|---|
+| `legacy` | Ubuntu 20.04 | 2.31 | Debian 11, Ubuntu 20.04, Linux Mint 20, RHEL/Alma/Rocky 9 и новее |
+| `standard` | Ubuntu 22.04 | 2.35 | Debian 12, Ubuntu 22.04/22.10, Linux Mint 21, Fedora 36–39 |
+| `modern` | Ubuntu 24.04 | 2.39 | Ubuntu 24.04 и новее, Linux Mint 22, Debian 13, Fedora 40+, Arch/CachyOS и другие rolling-дистрибутивы |
+
+Если сомневаетесь — ставьте `legacy`: он запустится почти везде. `standard` и `modern` нужны на случай, если на новой системе `legacy` конфликтует с системными библиотеками (например, с драйверами Mesa). Системы со старой glibc (Debian 10, Ubuntu 18.04, CentOS 7 и старше) не поддерживаются: PySide6 требует glibc 2.28+, а Python 3.14 — ещё новее.
 
 ## Лицензия
 

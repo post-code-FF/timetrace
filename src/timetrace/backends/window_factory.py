@@ -6,8 +6,6 @@ from timetrace.env_detect import DesktopEnv, SessionType
 
 
 def select_window_backend(desktop: DesktopEnv, session: SessionType) -> ActiveWindowBackend:
-    if desktop not in ("kde", "gnome"):
-        return NullActiveWindowBackend()
     if session == "x11":
         try:
             return X11EwmhActiveWindowBackend()

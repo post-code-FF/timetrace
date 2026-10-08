@@ -13,10 +13,11 @@ def test_null_backend_is_inert():
 
 
 class FakeX11Client:
-    def __init__(self, windows):
+    def __init__(self, windows, initial=None):
         # windows: list of (resource_class, title) to report on successive "changes"
+        # initial: window that is already active before any change happens
         self._windows = iter(windows)
-        self._current = None
+        self._current = initial
         self._changes_remaining = len(windows)
         self.closed = False
 
@@ -57,3 +58,17 @@ def test_stop_closes_client_and_halts_thread():
     time.sleep(0.05)
     backend.stop()
     assert client.closed is True
+
+
+def test_reports_window_that_is_already_active_at_start():
+    client = FakeX11Client([("code", "Visual Studio Code")], initial=("firefox", "Mozilla Firefox"))
+    events = []
+    backend = X11EwmhActiveWindowBackend(xlib_client=client)
+    backend.start(lambda rc, title, ts: events.append((rc, title)))
+
+    deadline = time.monotonic() + 2.0
+    while len(events) < 2 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    backend.stop()
+
+    assert events == [("firefox", "Mozilla Firefox"), ("code", "Visual Studio Code")]
