@@ -113,20 +113,64 @@ def watch_system_color_scheme(
     return subscriber(handler)
 
 
+# Палитры задают КАЖДУЮ роль явно. Если оставить часть ролей незаданной, Qt
+# подставит их из палитры платформы (в KDE -- из kdeglobals), и на тёмной
+# схеме ОС «светлая» тема остаётся тёмной, а «тёмная» почти не отличается.
+_PALETTES: dict[str, dict[str, tuple[int, ...]]] = {
+    "light": {
+        "Window": (239, 239, 239), "WindowText": (0, 0, 0),
+        "Base": (255, 255, 255), "AlternateBase": (247, 247, 247),
+        "ToolTipBase": (255, 255, 220), "ToolTipText": (0, 0, 0),
+        "Text": (0, 0, 0), "Button": (239, 239, 239), "ButtonText": (0, 0, 0),
+        "BrightText": (255, 255, 255), "Highlight": (48, 140, 198),
+        "HighlightedText": (255, 255, 255), "Link": (0, 0, 255),
+        "LinkVisited": (255, 0, 255), "PlaceholderText": (0, 0, 0, 128),
+        "Light": (255, 255, 255), "Midlight": (227, 227, 227),
+        "Mid": (160, 160, 160), "Dark": (120, 120, 120), "Shadow": (0, 0, 0),
+        "Disabled": (140, 140, 140),
+    },
+    "dark": {
+        "Window": (45, 45, 45), "WindowText": (230, 230, 230),
+        "Base": (30, 30, 30), "AlternateBase": (38, 38, 38),
+        "ToolTipBase": (60, 60, 60), "ToolTipText": (230, 230, 230),
+        "Text": (230, 230, 230), "Button": (53, 53, 53), "ButtonText": (230, 230, 230),
+        "BrightText": (255, 255, 255), "Highlight": (42, 130, 218),
+        "HighlightedText": (255, 255, 255), "Link": (90, 170, 255),
+        "LinkVisited": (180, 130, 230), "PlaceholderText": (230, 230, 230, 128),
+        "Light": (80, 80, 80), "Midlight": (66, 66, 66),
+        "Mid": (38, 38, 38), "Dark": (25, 25, 25), "Shadow": (15, 15, 15),
+        "Disabled": (127, 127, 127),
+    },
+}
+
+
+def _build_palette(scheme: str):
+    from PySide6.QtGui import QColor, QPalette
+
+    colors = dict(_PALETTES[scheme])
+    disabled = QColor(*colors.pop("Disabled"))
+    palette = QPalette()
+    for role_name, rgba in colors.items():
+        palette.setColor(getattr(QPalette, role_name), QColor(*rgba))
+    for role in (QPalette.WindowText, QPalette.Text, QPalette.ButtonText):
+        palette.setColor(QPalette.Disabled, role, disabled)
+    return palette
+
+
 def apply_theme(app, mode: Literal["light", "dark", "system"]) -> None:
-    from PySide6.QtGui import QPalette, QColor
+    from PySide6.QtGui import QPalette
+
+    # Запоминаем палитру, с которой стартовала ОС, до первого вмешательства.
+    if not hasattr(app, "_timetrace_os_palette"):
+        app._timetrace_os_palette = QPalette(app.palette())
 
     effective = mode
     if mode == "system":
         detected = read_system_color_scheme()
-        effective = detected if detected in ("light", "dark") else "light"
+        if detected not in ("light", "dark"):
+            # Портал недоступен -- не гадаем: оставляем как у ОС.
+            app.setPalette(QPalette(app._timetrace_os_palette))
+            return
+        effective = detected
 
-    palette = QPalette()
-    if effective == "dark":
-        palette.setColor(QPalette.Window, QColor(45, 45, 45))
-        palette.setColor(QPalette.WindowText, QColor(230, 230, 230))
-        palette.setColor(QPalette.Base, QColor(30, 30, 30))
-        palette.setColor(QPalette.Text, QColor(230, 230, 230))
-        palette.setColor(QPalette.Button, QColor(53, 53, 53))
-        palette.setColor(QPalette.ButtonText, QColor(230, 230, 230))
-    app.setPalette(palette)
+    app.setPalette(_build_palette(effective))
