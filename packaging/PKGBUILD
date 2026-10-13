@@ -1,6 +1,6 @@
 # Maintainer: <name> <email>
 pkgname=timetrace-git
-pkgver=0.1.1
+pkgver=0.1.2
 pkgrel=1
 pkgdesc="Time tracker for Linux: any desktop on X11, KDE & GNOME on Wayland"
 arch=('x86_64')
