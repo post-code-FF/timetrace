@@ -1,10 +1,13 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime, timezone, tzinfo
 from typing import Callable
 
 from PySide6.QtCore import QRectF, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QToolTip, QWidget
+
+from timetrace.ui.time_ruler import compute_ticks
 
 TRACK_HEIGHT_PX = 96
 MIN_SEGMENT_WIDTH_PX = 4.0
@@ -16,6 +19,8 @@ class Segment:
     width: float
     color: tuple[int, int, int]
     resource_class: str | None = None
+    start_ts: int | None = None
+    end_ts: int | None = None
 
 
 def intervals_to_segments(
@@ -36,7 +41,16 @@ def intervals_to_segments(
         if width < MIN_SEGMENT_WIDTH_PX:
             x -= (MIN_SEGMENT_WIDTH_PX - width) / 2
             width = MIN_SEGMENT_WIDTH_PX
-        segments.append(Segment(x=x, width=width, color=color, resource_class=resource_class))
+        segments.append(
+            Segment(
+                x=x,
+                width=width,
+                color=color,
+                resource_class=resource_class,
+                start_ts=start_ts,
+                end_ts=end_ts,
+            )
+        )
     return segments
 
 
@@ -57,6 +71,18 @@ class TimelineTrackWidget(QWidget):
         self._current_time_ts: int | None = None
         self._hovered_resource_class: str | None = None
         self._segment_label_resolver: Callable[[str], str] | None = None
+        self._tz: tzinfo = timezone.utc
+
+    def set_timezone(self, tz: tzinfo) -> None:
+        self._tz = tz
+
+    def _segment_tooltip(self, segment: Segment) -> str:
+        label = self._segment_label_resolver(segment.resource_class)
+        if segment.start_ts is None or segment.end_ts is None:
+            return label
+        start = datetime.fromtimestamp(segment.start_ts / 1000, self._tz).strftime("%H:%M:%S")
+        end = datetime.fromtimestamp(segment.end_ts / 1000, self._tz).strftime("%H:%M:%S")
+        return f"{label}\n{start} – {end}"
 
     def set_segment_label_resolver(self, resolver: Callable[[str], str] | None) -> None:
         """Opt-in tooltip: when set, hovering a segment shows resolver(resource_class)."""
@@ -83,16 +109,18 @@ class TimelineTrackWidget(QWidget):
         )
         pos_x = event.position().x()
         hovered = None
+        hovered_segment = None
         for segment in segments:
             if segment.x <= pos_x < segment.x + segment.width:
                 hovered = segment.resource_class
+                hovered_segment = segment
                 break
         self._set_hovered(hovered)
 
         if self._segment_label_resolver is not None:
-            if hovered is not None:
+            if hovered_segment is not None:
                 QToolTip.showText(
-                    event.globalPosition().toPoint(), self._segment_label_resolver(hovered), self
+                    event.globalPosition().toPoint(), self._segment_tooltip(hovered_segment), self
                 )
             else:
                 QToolTip.hideText()
@@ -127,6 +155,13 @@ class TimelineTrackWidget(QWidget):
             ):
                 color = _brighten(color)
             painter.fillRect(QRectF(segment.x, 0, segment.width, height), QColor(*color))
+
+        grid_color = QColor(255, 255, 255, 40)
+        for x, _label in compute_ticks(
+            self._day_start_ts, self._day_end_ts, float(width), self._tz
+        ):
+            painter.setPen(QPen(grid_color, 1))
+            painter.drawLine(int(x), 0, int(x), height)
 
         if self._current_time_ts is not None:
             day_span = self._day_end_ts - self._day_start_ts

@@ -70,3 +70,24 @@ def test_resolve_icon_uses_injected_loader_and_caches(tmp_path):
     # test just verifies the loader receives the resolved icon name when found
     # per the test note: "keep this test loose (it accepts either a real system match or the unknown fallback)"
     assert calls[0] in ["visual-studio-code", "vscode", "unknown"] or icon1 == "ICON[unknown]"
+
+
+def test_app_icon_is_bundled_and_not_null(qtbot):
+    from timetrace.icons import app_icon
+
+    assert not app_icon().isNull()
+
+
+def test_steam_game_shortcut_is_not_matched_as_steam_app(tmp_path):
+    apps_dir = tmp_path / "applications"
+    apps_dir.mkdir()
+    write_desktop_file(
+        apps_dir / "Forza.desktop",
+        name="Forza Horizon 6",
+        exec_="steam steam://rungameid/2483190",
+        icon="steam_icon_2483190",
+    )
+    steam = apps_dir / "steam.desktop"
+    write_desktop_file(steam, name="Steam", exec_="/usr/bin/steam %U", icon="steam")
+
+    assert find_desktop_entry("steam", search_dirs=[apps_dir]) == steam

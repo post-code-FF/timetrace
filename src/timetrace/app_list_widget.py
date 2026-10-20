@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import QHeaderView, QLabel, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 
+from timetrace.app_names import display_name
 from timetrace.app_color import color_for_resource_class
 from timetrace.db import AppInterval
 from timetrace.icons import resolve_icon
@@ -13,7 +14,7 @@ _HIGHLIGHT_COLOR = QColor(100, 150, 220, 90)
 
 @dataclass(frozen=True)
 class AppSummary:
-    resource_class: str
+    resource_class: str  # отображаемое название (для игр — название игры)
     total_ms: int
     percent: float
 
@@ -29,7 +30,8 @@ def aggregate_app_durations(intervals: Sequence[AppInterval]) -> list[AppSummary
     totals: dict[str, int] = {}
     for interval in intervals:
         duration = (interval.end_ts or 0) - interval.start_ts
-        totals[interval.resource_class] = totals.get(interval.resource_class, 0) + duration
+        name = display_name(interval.resource_class, interval.window_title)
+        totals[name] = totals.get(name, 0) + duration
 
     grand_total = sum(totals.values())
     summaries = [
@@ -60,9 +62,13 @@ class AppListWidget(QWidget):
 
     def set_intervals(self, intervals: Sequence[AppInterval]) -> None:
         summaries = aggregate_app_durations(intervals)
+        icon_keys: dict[str, str] = {}
+        for interval in intervals:
+            name = display_name(interval.resource_class, interval.window_title)
+            icon_keys.setdefault(name, interval.resource_class)
         self._table.setRowCount(len(summaries))
         for row, summary in enumerate(summaries):
-            icon = resolve_icon(summary.resource_class)
+            icon = resolve_icon(icon_keys.get(summary.resource_class, summary.resource_class))
             name_item = QTableWidgetItem(icon, summary.resource_class)
             self._table.setItem(row, 0, name_item)
             self._table.setItem(row, 1, QTableWidgetItem(f"{summary.percent:.1f}%"))

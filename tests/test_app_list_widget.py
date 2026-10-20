@@ -70,3 +70,16 @@ def test_set_highlighted_resource_class_colors_matching_row(qtbot):
 
     widget.set_highlighted_resource_class(None)
     assert widget._table.item(highlighted_row, 0).background() == QBrush()
+
+
+def test_aggregate_merges_game_classes_under_one_name(monkeypatch):
+    monkeypatch.setattr(
+        "timetrace.app_list_widget.display_name",
+        lambda rc, title=None: "Forza Horizon 6" if rc.startswith("steam_app_") else rc,
+    )
+    intervals = [
+        AppInterval(id=1, resource_class="steam_app_1", window_title=None, start_ts=0, end_ts=60_000),
+        AppInterval(id=2, resource_class="steam_app_2", window_title=None, start_ts=60_000, end_ts=90_000),
+    ]
+    summaries = aggregate_app_durations(intervals)
+    assert [(s.resource_class, s.total_ms) for s in summaries] == [("Forza Horizon 6", 90_000)]

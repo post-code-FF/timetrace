@@ -4,7 +4,7 @@ set -euo pipefail
 # Использование: build_deb_rpm.sh [legacy|standard|modern]
 # Вариант должен быть собран через build_in_docker.sh (dist/timetrace-<вариант>).
 VARIANT="${1:-standard}"
-VERSION="0.1.2"
+VERSION="0.1.3"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUT_DIR="$SCRIPT_DIR/out"
 STAGE_DIR="$SCRIPT_DIR/stage"

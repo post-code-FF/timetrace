@@ -1,7 +1,8 @@
 from typing import Callable
 
-from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon, QWidget
+
+from timetrace.icons import app_icon
 
 
 class TrayIcon(QSystemTrayIcon):
@@ -11,7 +12,7 @@ class TrayIcon(QSystemTrayIcon):
         super().__init__(parent)
         self._window = window
         self._on_quit_callback = on_quit
-        self.setIcon(QIcon.fromTheme("timetrace"))
+        self.setIcon(app_icon())
         self.setToolTip("TimeTrace")
 
         menu = QMenu()

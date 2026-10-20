@@ -51,6 +51,9 @@ def find_desktop_entry(
         if not parser.has_section("Desktop Entry"):
             continue
         exec_value = parser.get("Desktop Entry", "Exec", fallback="")
+        if "steam://rungameid/" in exec_value:
+            # Ярлык игры запускает саму игру через `steam`, это не приложение Steam.
+            continue
         exec_basename = exec_value.split()[0].rsplit("/", 1)[-1] if exec_value else ""
         if exec_basename.lower() == target or path.stem.lower() == target:
             return path
@@ -69,8 +72,12 @@ def resolve_icon(resource_class: str, icon_loader: Callable[[str], object] | Non
         return _icon_cache[resource_class]
 
     loader = icon_loader or _real_icon_loader
+    from timetrace.app_names import steam_icon_name
+
     entry = find_desktop_entry(resource_class)
     icon_name = icon_name_from_desktop_entry(entry) if entry else None
+    if icon_name is None:
+        icon_name = steam_icon_name(resource_class)
     icon = loader(icon_name or "unknown")
     _icon_cache[resource_class] = icon
     return icon
@@ -80,3 +87,15 @@ def _real_icon_loader(icon_name: str):
     from PySide6.QtGui import QIcon
 
     return QIcon.fromTheme(icon_name)
+
+
+def app_icon():
+    """Иконка приложения: встроенный файл, а если его нет — иконка из темы."""
+    from importlib import resources
+
+    from PySide6.QtGui import QIcon
+
+    icon_file = resources.files("timetrace.assets") / "icon.png"
+    if icon_file.is_file():
+        return QIcon(str(icon_file))
+    return QIcon.fromTheme("timetrace")

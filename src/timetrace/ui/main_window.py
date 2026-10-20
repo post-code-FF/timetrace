@@ -3,12 +3,22 @@ from datetime import datetime, tzinfo
 from typing import Callable
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QHBoxLayout, QMainWindow, QToolButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
+from timetrace.app_names import display_name
 from timetrace.app_color import color_for_resource_class
 from timetrace.app_list_widget import AppListWidget, format_duration
 from timetrace.db import Store, day_bounds_ts
 from timetrace.ui.date_nav import DateNavBar
+from timetrace.ui.time_ruler import TimeRulerWidget
 from timetrace.ui.timeline_widget import TimelineTrackWidget
 
 PRESENCE_COLORS = {"active": (46, 204, 64), "idle": (219, 68, 55), "sleep": (219, 68, 55)}
@@ -47,10 +57,20 @@ class MainWindow(QMainWindow):
         top_row.addWidget(self._settings_button)
         layout.addLayout(top_row)
 
+        self.time_ruler = TimeRulerWidget(tz)
         self.presence_track = TimelineTrackWidget()
         self.app_track = TimelineTrackWidget()
-        layout.addWidget(self.presence_track)
-        layout.addWidget(self.app_track)
+        self.presence_track.set_timezone(tz)
+        self.app_track.set_timezone(tz)
+        tracks = QGridLayout()
+        tracks.setHorizontalSpacing(8)
+        tracks.setColumnStretch(1, 1)
+        tracks.addWidget(self.time_ruler, 0, 1)
+        tracks.addWidget(QLabel("Активность"), 1, 0)
+        tracks.addWidget(self.presence_track, 1, 1)
+        tracks.addWidget(QLabel("Приложения"), 2, 0)
+        tracks.addWidget(self.app_track, 2, 1)
+        layout.addLayout(tracks)
 
         self.app_list = AppListWidget()
         layout.addWidget(self.app_list)
@@ -58,6 +78,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         self.app_track.segmentHovered.connect(self.app_list.set_highlighted_resource_class)
+        self.app_track.set_segment_label_resolver(lambda name: name)
         self.presence_track.set_segment_label_resolver(
             lambda state: PRESENCE_LABELS.get(state, state)
         )
@@ -90,15 +111,17 @@ class MainWindow(QMainWindow):
         self.presence_track.set_intervals(presence_tuples, render_start_ts, render_end_ts)
 
         app_rows = self._store.app_intervals_for_day(day_start_ts, day_end_ts, now_ts)
-        app_tuples = [
-            (r.start_ts, r.end_ts, color_for_resource_class(r.resource_class), r.resource_class)
-            for r in app_rows
-        ]
+        app_tuples = []
+        for r in app_rows:
+            name = display_name(r.resource_class, r.window_title)
+            app_tuples.append((r.start_ts, r.end_ts, color_for_resource_class(name), name))
         self.app_track.set_intervals(app_tuples, render_start_ts, render_end_ts)
+        self.time_ruler.set_range(render_start_ts, render_end_ts)
 
         is_today = selected_day == now.date()
         self.presence_track.set_current_time_ts(now_ts if is_today else None)
         self.app_track.set_current_time_ts(now_ts if is_today else None)
+        self.time_ruler.set_current_time_ts(now_ts if is_today else None)
 
         self.app_list.set_intervals(app_rows)
         active_total_ms = sum(

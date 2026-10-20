@@ -22,21 +22,21 @@ def test_full_day_interval_spans_full_width():
     segments = intervals_to_segments(
         [(0, 1000, (0, 255, 0))], day_start_ts=0, day_end_ts=1000, track_width_px=100
     )
-    assert segments == [Segment(x=0.0, width=100.0, color=(0, 255, 0))]
+    assert segments == [Segment(x=0.0, width=100.0, color=(0, 255, 0), start_ts=0, end_ts=1000)]
 
 
 def test_half_day_interval_spans_half_width():
     segments = intervals_to_segments(
         [(0, 500, (0, 255, 0))], day_start_ts=0, day_end_ts=1000, track_width_px=100
     )
-    assert segments == [Segment(x=0.0, width=50.0, color=(0, 255, 0))]
+    assert segments == [Segment(x=0.0, width=50.0, color=(0, 255, 0), start_ts=0, end_ts=500)]
 
 
 def test_interval_offset_from_day_start():
     segments = intervals_to_segments(
         [(250, 750, (255, 0, 0))], day_start_ts=0, day_end_ts=1000, track_width_px=100
     )
-    assert segments == [Segment(x=25.0, width=50.0, color=(255, 0, 0))]
+    assert segments == [Segment(x=25.0, width=50.0, color=(255, 0, 0), start_ts=250, end_ts=750)]
 
 
 def test_multiple_intervals_preserve_order():
@@ -65,7 +65,7 @@ def test_segment_resource_class_defaults_to_none_for_three_tuples():
     segments = intervals_to_segments(
         [(0, 1000, (0, 255, 0))], day_start_ts=0, day_end_ts=1000, track_width_px=100
     )
-    assert segments == [Segment(x=0.0, width=100.0, color=(0, 255, 0), resource_class=None)]
+    assert segments == [Segment(x=0.0, width=100.0, color=(0, 255, 0), resource_class=None, start_ts=0, end_ts=1000)]
 
 
 def test_segment_carries_resource_class_from_four_tuples():

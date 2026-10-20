@@ -1,6 +1,6 @@
 [project]
 name = "timetrace"
-version = "0.1.2"
+version = "0.1.3"
 description = "Time tracker for Linux: any desktop on X11, KDE & GNOME on Wayland"
 requires-python = ">=3.11"
 dependencies = [
@@ -23,6 +23,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
+"timetrace.assets" = ["icon.png"]
 "timetrace.assets.kwin_script" = ["metadata.json", "contents/code/main.js"]
 "timetrace.assets.gnome_extension" = ["metadata.json", "extension.js"]
 

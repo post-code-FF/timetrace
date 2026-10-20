@@ -32,6 +32,7 @@ def build_app(argv: list[str]):
     from timetrace.config import load_config
     from timetrace.db import Store
     from timetrace.env_detect import detect_desktop_environment, detect_session_type
+    from timetrace.icons import app_icon
     from timetrace.tracking.coordinator import TrackingCoordinator
     from timetrace.ui.main_window import MainWindow
     from timetrace.ui.settings_dialog import SettingsDialog
@@ -39,6 +40,8 @@ def build_app(argv: list[str]):
 
     app = QApplication.instance() or QApplication(argv)
     app.setQuitOnLastWindowClosed(False)
+    app.setDesktopFileName("timetrace")
+    app.setWindowIcon(app_icon())
 
     bus = QDBusConnection.sessionBus()
     # Without a session bus (e.g. startx + a bare window manager) nobody else
