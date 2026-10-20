@@ -11,7 +11,7 @@ provides=('timetrace')
 conflicts=('timetrace')
 makedepends=('imagemagick')
 source_x86_64=("timetrace-${pkgver}-x86_64.bin::https://github.com/post-code-FF/timetrace/releases/download/v${pkgver}/timetrace-modern")
-sha256sums_x86_64=('d0d0e6752ca0cb67e579fa1733e269cb8ee922a347fc676e020704784e5e1ab1')
+sha256sums_x86_64=('6a09dc31c168976dee850240b0b69ad7e42f4f9f325f3980d8b4332d8ffe2f39')
 
 package() {
     install -Dm755 "${srcdir}/timetrace-${pkgver}-x86_64.bin" "${pkgdir}/usr/bin/timetrace"
