@@ -13,7 +13,13 @@ def test_format_duration_hours_minutes_seconds():
     assert format_duration(7_265_000) == "2:01:05"
 
 
-def test_aggregate_sums_by_resource_class():
+def test_aggregate_sums_by_resource_class(tmp_path, monkeypatch):
+    from timetrace.app_names import AppNameResolver
+
+    (tmp_path / "firefox.desktop").write_text("[Desktop Entry]\nName=Firefox\nExec=firefox\n")
+    (tmp_path / "code.desktop").write_text("[Desktop Entry]\nName=Visual Studio Code\nExec=code\n")
+    resolver = AppNameResolver(steam_roots=[], desktop_dirs=[tmp_path])
+    monkeypatch.setattr("timetrace.app_list_widget.display_name", resolver.display_name)
     intervals = [
         AppInterval(id=1, resource_class="firefox", window_title=None, start_ts=0, end_ts=60_000),
         AppInterval(id=2, resource_class="code", window_title=None, start_ts=60_000, end_ts=120_000),
@@ -21,8 +27,8 @@ def test_aggregate_sums_by_resource_class():
     ]
     summaries = aggregate_app_durations(intervals)
     by_class = {s.resource_class: s for s in summaries}
-    assert by_class["firefox"].total_ms == 120_000
-    assert by_class["code"].total_ms == 60_000
+    assert by_class["Firefox"].total_ms == 120_000
+    assert by_class["Visual Studio Code"].total_ms == 60_000
 
 
 def test_aggregate_sorts_descending_by_duration():

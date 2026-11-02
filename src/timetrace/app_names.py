@@ -11,6 +11,8 @@ import re
 from collections.abc import Sequence
 from pathlib import Path
 
+from timetrace.desktop_entries import application_dirs, find_entry
+
 _STEAM_APP_RE = re.compile(r"^steam_app_(\d+)$")
 _RUNGAMEID_RE = re.compile(r"steam://rungameid/(\d+)")
 _ACF_NAME_RE = re.compile(r'"name"\s+"([^"]*)"')
@@ -24,12 +26,9 @@ _STEAM_ROOTS = [
     _HOME / ".steam" / "root",
     _HOME / ".var" / "app" / "com.valvesoftware.Steam" / ".local" / "share" / "Steam",
 ]
-_DESKTOP_DIRS = [
-    _HOME / ".local" / "share" / "applications",
+_DESKTOP_DIRS = application_dirs() + [
     _HOME / "Desktop",
     _HOME / "Рабочий стол",
-    Path("/usr/share/applications"),
-    Path("/usr/local/share/applications"),
 ]
 
 
@@ -77,6 +76,14 @@ class AppNameResolver:
             if known:
                 return known[0]
             return resource_class[: -len(".exe")]
+        entry = find_entry(resource_class, self._desktop_dirs)
+        if entry:
+            name = entry.name()
+            # Recognize the legacy launcher label found in some Sotto setups.
+            if entry.desktop_id.casefold() == "io.github.trendorin.sotto" and name == "Whisper Dictation":
+                return "Sotto"
+            if name:
+                return name
         return resource_class
 
     def _load(self) -> None:

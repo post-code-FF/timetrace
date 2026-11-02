@@ -57,3 +57,15 @@ def test_wine_exe_uses_desktop_entry_then_strips_extension(tmp_path):
 
 def test_regular_class_unchanged(tmp_path):
     assert _resolver(tmp_path).display_name("firefox") == "firefox"
+
+
+def test_regular_app_uses_desktop_name(tmp_path):
+    (tmp_path / 'chatgpt.desktop').write_text('[Desktop Entry]\nName=ChatGPT\nExec=chatgpt %U\nIcon=chatgpt\n')
+    resolver = AppNameResolver(steam_roots=[], desktop_dirs=[tmp_path])
+    assert resolver.display_name('Chatgpt') == 'ChatGPT'
+
+
+def test_sotto_uses_product_name_for_legacy_launcher(tmp_path):
+    (tmp_path / 'io.github.trendorin.Sotto.desktop').write_text('[Desktop Entry]\nName=Whisper Dictation\nExec=whisper-hotkey\nIcon=audio-input-microphone\n')
+    resolver = AppNameResolver(steam_roots=[], desktop_dirs=[tmp_path])
+    assert resolver.display_name('io.github.trendorin.Sotto') == 'Sotto'

@@ -1,70 +1,20 @@
-import configparser
+from glob import escape
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Callable
 
-_DEFAULT_SEARCH_DIRS = [
-    Path.home() / ".local" / "share" / "applications",
-    Path("/usr/share/applications"),
-    Path("/usr/local/share/applications"),
-]
+from timetrace.desktop_entries import data_dirs, find_entry, read_entry
 
 _icon_cache: dict[str, object] = {}
 
 
-def find_desktop_entry(
-    resource_class: str, search_dirs: Sequence[Path] | None = None
-) -> Path | None:
-    dirs = search_dirs if search_dirs is not None else _DEFAULT_SEARCH_DIRS
-    target = resource_class.lower()
-    # GNOME's Shell.WindowTracker reports app ids as the desktop file's id
-    # including the ".desktop" suffix (e.g. "org.mozilla.firefox.desktop"),
-    # unlike X11/KDE's bare WM_CLASS -- strip it so the comparisons below
-    # (against StartupWMClass, Exec basename, and file stem, none of which
-    # carry the suffix) can still match.
-    if target.endswith(".desktop"):
-        target = target[: -len(".desktop")]
-    candidates = []
-    for directory in dirs:
-        if not directory.is_dir():
-            continue
-        candidates.extend(sorted(directory.glob("*.desktop")))
-
-    for path in candidates:
-        parser = configparser.ConfigParser(interpolation=None)
-        try:
-            parser.read(path, encoding="utf-8")
-        except configparser.Error:
-            continue
-        if not parser.has_section("Desktop Entry"):
-            continue
-        wm_class = parser.get("Desktop Entry", "StartupWMClass", fallback="")
-        if wm_class.lower() == target:
-            return path
-
-    for path in candidates:
-        parser = configparser.ConfigParser(interpolation=None)
-        try:
-            parser.read(path, encoding="utf-8")
-        except configparser.Error:
-            continue
-        if not parser.has_section("Desktop Entry"):
-            continue
-        exec_value = parser.get("Desktop Entry", "Exec", fallback="")
-        if "steam://rungameid/" in exec_value:
-            # Ярлык игры запускает саму игру через `steam`, это не приложение Steam.
-            continue
-        exec_basename = exec_value.split()[0].rsplit("/", 1)[-1] if exec_value else ""
-        if exec_basename.lower() == target or path.stem.lower() == target:
-            return path
-
-    return None
+def find_desktop_entry(resource_class: str, search_dirs: Sequence[Path] | None = None) -> Path | None:
+    entry = find_entry(resource_class, search_dirs)
+    return entry.path if entry else None
 
 
 def icon_name_from_desktop_entry(entry_path: Path) -> str | None:
-    parser = configparser.ConfigParser(interpolation=None)
-    parser.read(entry_path, encoding="utf-8")
-    return parser.get("Desktop Entry", "Icon", fallback=None)
+    return read_entry(entry_path).get("Icon") or None
 
 
 def resolve_icon(resource_class: str, icon_loader: Callable[[str], object] | None = None):
@@ -78,7 +28,9 @@ def resolve_icon(resource_class: str, icon_loader: Callable[[str], object] | Non
     icon_name = icon_name_from_desktop_entry(entry) if entry else None
     if icon_name is None:
         icon_name = steam_icon_name(resource_class)
-    icon = loader(icon_name or "unknown")
+    icon = loader(icon_name or resource_class.removesuffix(".desktop"))
+    if icon_loader is None and icon.pixmap(24, 24).isNull():
+        icon = _fallback_icon()
     _icon_cache[resource_class] = icon
     return icon
 
@@ -86,7 +38,40 @@ def resolve_icon(resource_class: str, icon_loader: Callable[[str], object] | Non
 def _real_icon_loader(icon_name: str):
     from PySide6.QtGui import QIcon
 
-    return QIcon.fromTheme(icon_name)
+    path = Path(icon_name)
+    if path.is_absolute():
+        return QIcon(str(path))
+    icon = QIcon.fromTheme(icon_name)
+    if not icon.pixmap(24, 24).isNull():
+        return icon
+    # Frozen Qt and minimal desktops may not know the host icon theme.
+    # Search exported icon roots and pixmaps as well, including Flatpak/Snap.
+    roots = [Path.home() / ".icons"] + [p / "icons" for p in data_dirs()]
+    for root in roots:
+        for suffix in ("", ".png", ".svg", ".svgz", ".xpm"):
+            filename = icon_name + suffix
+            if "/" in filename or filename in (".", ".."):
+                continue
+            for candidate in sorted(root.glob(f"*/*/*/{escape(filename)}")) + [root / filename]:
+                if candidate.is_file():
+                    found = QIcon(str(candidate))
+                    if not found.pixmap(24, 24).isNull():
+                        return found
+    for root in data_dirs():
+        for suffix in ("", ".png", ".svg", ".svgz", ".xpm"):
+            candidate = root / "pixmaps" / (icon_name + suffix)
+            if candidate.is_file():
+                found = QIcon(str(candidate))
+                if not found.pixmap(24, 24).isNull():
+                    return found
+    return icon
+
+
+def _fallback_icon():
+    from importlib import resources
+    from PySide6.QtGui import QIcon
+
+    return QIcon(str(resources.files("timetrace.assets") / "application.svg"))
 
 
 def app_icon():
