@@ -1,7 +1,7 @@
 {
-    "uuid": "timetrace-fork@local",
-    "name": "TimeTrace Fork GNOME Bridge",
-    "description": "Read-only focus, lock and idle state for the isolated TimeTrace fork",
+    "uuid": "timetrace@timetrace.app",
+    "name": "TimeTrace GNOME Bridge",
+    "description": "Read-only focus, lock and idle state for TimeTrace",
     "shell-version": ["51"],
     "session-modes": ["user", "unlock-dialog"],
     "version": 1

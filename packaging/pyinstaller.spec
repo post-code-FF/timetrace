@@ -26,7 +26,7 @@ exe = EXE(
     a.scripts,
     a.binaries,
     a.datas,
-    name="timetrace-gnome-fork",
+    name="timetrace",
     console=False,
     onefile=True,
 )

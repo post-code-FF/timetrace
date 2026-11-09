@@ -44,16 +44,16 @@ def build_app(argv: list[str]):
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     app = QApplication.instance() or QApplication(argv)
     app.setQuitOnLastWindowClosed(False)
-    app.setDesktopFileName("timetrace-gnome-fork")
+    app.setDesktopFileName("timetrace")
     app.setWindowIcon(app_icon())
 
     bus = QDBusConnection.sessionBus()
     # Without a session bus (e.g. startx + a bare window manager) nobody else
     # can own the name either, so a failed registration only means "another
     # instance" when we are actually connected.
-    is_primary_instance = not bus.isConnected() or bus.registerService("org.timetrace.GnomeFork.App")
+    is_primary_instance = not bus.isConnected() or bus.registerService("org.timetrace.App")
     if not is_primary_instance:
-        iface = QDBusInterface("org.timetrace.GnomeFork.App", "/App", "", bus)
+        iface = QDBusInterface("org.timetrace.App", "/App", "", bus)
         iface.call("Raise")
         return app, None, None, None, None
 
@@ -95,7 +95,13 @@ def build_app(argv: list[str]):
     coordinator.start()
 
     window = MainWindow(store, tz=tz)
-    window.setWindowTitle("TimeTrace GNOME Fork")
+    window.setWindowTitle("TimeTrace")
+    def update_extension_notice():
+        extension_notice = getattr(window_backend, "extension_notice", None) or ""
+        if window.statusBar().currentMessage() != extension_notice:
+            window.statusBar().showMessage(extension_notice)
+
+    update_extension_notice()
 
     def open_settings() -> None:
         nonlocal config
@@ -104,7 +110,7 @@ def build_app(argv: list[str]):
             config_path=paths.config_file_path(),
             on_idle_threshold_changed=coordinator.update_idle_threshold,
             on_theme_changed=set_theme,
-            exec_path=str(__import__("pathlib").Path(sys.executable).parent / "timetrace-gnome-fork"),
+            exec_path="timetrace",
         )
         dialog.exec()
         config = load_config(paths.config_file_path())
@@ -148,6 +154,7 @@ def build_app(argv: list[str]):
 
     event_timer = QTimer()
     event_timer.timeout.connect(coordinator.process_pending_events)
+    event_timer.timeout.connect(update_extension_notice)
     event_timer.start(250)
 
     refresh_timer = QTimer()

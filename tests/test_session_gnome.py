@@ -81,3 +81,23 @@ def test_restarted_shell_marks_unobserved_gap():
     list(stream.decode(packet(ts=1000)))
     event = list(stream.decode(packet(ts=9000, epoch='new-shell')))[0]
     assert event['gap_since'] == 1000
+
+
+def test_start_installs_bundled_extension(qtbot, tmp_path, monkeypatch):
+    import subprocess
+    from timetrace.backends import gnome_extension
+    data_home = tmp_path / 'data'
+    monkeypatch.setenv('XDG_DATA_HOME', str(data_home))
+
+    def shell_command(args, **kwargs):
+        return subprocess.CompletedProcess(args, 0, 'GNOME Shell 51.1\n', '')
+
+    monkeypatch.setattr(gnome_extension.subprocess, 'run', shell_command)
+    backend = GnomeSessionBackend()
+    try:
+        backend.start(lambda *args: None)
+        installed = data_home / 'gnome-shell/extensions/timetrace@timetrace.app/extension.js'
+        assert installed.is_file()
+        assert 'GetEvents' in installed.read_text()
+    finally:
+        backend.stop()

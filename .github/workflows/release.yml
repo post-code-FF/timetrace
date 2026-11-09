@@ -1,0 +1,64 @@
+name: Linux release builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['release/**']
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux x86_64 (${{ matrix.variant }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [legacy, standard, modern]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build standalone executable
+        run: bash packaging/build_in_docker.sh "${{ matrix.variant }}"
+      - name: Test application and GNOME integration
+        run: |
+          docker run --rm -v "$PWD:/source" -w /source \
+            "timetrace-build-${{ matrix.variant }}" bash -ec '
+              apt-get update
+              apt-get install -y --no-install-recommends gjs dbus
+              uv pip install pytest pytest-qt
+              python -m pytest -q
+              TIMETRACE_PRIVATE_BUS_TEST=1 dbus-run-session -- python scripts/test-dbus-integration.py
+              test "$(/build/packaging/dist/timetrace --version)" = "timetrace 0.1.5"
+            '
+      - name: Build Debian and RPM packages
+        run: |
+          docker build -f packaging/docker/Dockerfile.fpm -t timetrace-fpm .
+          docker run --rm -v "$PWD:/source" -w /source timetrace-fpm \
+            bash packaging/build_deb_rpm.sh "${{ matrix.variant }}"
+          mkdir -p release-assets
+          cp "packaging/dist/timetrace-${{ matrix.variant }}" packaging/out/* release-assets/
+      - name: Build Arch package
+        if: matrix.variant == 'modern'
+        run: |
+          version=$(sed -n 's/^pkgver=//p' packaging/PKGBUILD)
+          checksum=$(sha256sum packaging/dist/timetrace-modern | cut -d ' ' -f 1)
+          mkdir arch-build
+          cp packaging/PKGBUILD packaging/timetrace.desktop packaging/icon.png arch-build/
+          cp packaging/dist/timetrace-modern "arch-build/timetrace-${version}-x86_64.bin"
+          sed -i "s/^sha256sums_x86_64=.*/sha256sums_x86_64=('$checksum')/" arch-build/PKGBUILD
+          docker run --rm -v "$PWD/arch-build:/pkg" archlinux:base-devel bash -ec '
+            pacman -Syu --noconfirm --needed imagemagick
+            useradd -m builder
+            chown -R builder:builder /pkg
+            su builder -s /bin/bash -c "cd /pkg && makepkg --nodeps --noconfirm"
+          '
+          cp arch-build/*.pkg.tar.zst release-assets/
+          tar --zstd -tf release-assets/*.pkg.tar.zst
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-${{ matrix.variant }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14

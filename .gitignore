@@ -14,10 +14,6 @@ packaging/*.pkg.tar.zst
 packaging/*.bin
 packaging/pkgs/
 
-# Local build products and private runtime data
-packaging/arch-fork/pkg/
-packaging/arch-fork/src/
-packaging/arch-fork/timetrace-gnome-fork
 *.pkg.tar.zst
 *.db
 *.db-wal

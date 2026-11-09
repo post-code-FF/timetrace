@@ -18,12 +18,12 @@ def set_autostart_enabled(
         path.unlink(missing_ok=True)
         return
 
-    exec_path = exec_path or "timetrace-gnome-fork"
+    exec_path = exec_path or "timetrace"
     path.parent.mkdir(parents=True, exist_ok=True)
     content = (
         "[Desktop Entry]\n"
         "Type=Application\n"
-        "Name=TimeTrace GNOME Fork\n"
+        "Name=TimeTrace\n"
         f"Exec={exec_path} --minimized\n"
         "X-GNOME-Autostart-enabled=true\n"
     )

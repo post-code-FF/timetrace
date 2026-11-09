@@ -4,7 +4,7 @@ import Shell from 'gi://Shell';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const XML = `<node><interface name="org.timetrace.GnomeFork.Bridge1">
+const XML = `<node><interface name="org.timetrace.Bridge1">
 <method name="GetEvents"><arg type="s" direction="in" name="cursor"/>
 <arg type="s" direction="out" name="events"/></method>
 <signal name="Changed"/>
@@ -23,7 +23,7 @@ export default class TimeTraceBridge extends Extension {
             this._tracker = Shell.WindowTracker.get_default();
             this._idleMonitor = global.backend.get_core_idle_monitor();
             this._dbus = Gio.DBusExportedObject.wrapJSObject(XML, this);
-            this._dbus.export(Gio.DBus.session, '/org/timetrace/GnomeFork/Bridge');
+            this._dbus.export(Gio.DBus.session, '/org/timetrace/Bridge');
             this._connect(global.display, 'notify::focus-window', () => this._sample());
             this._connect(Main.sessionMode, 'updated', () => this._sample());
             this._connect(global.workspace_manager, 'active-workspace-changed', () => this._sample());

@@ -1,18 +1,20 @@
 """Versioned, read-only GNOME Shell bridge; persistent Qt D-Bus connection.
 
-The extension is explicitly installed by scripts/install-extension.sh. Starting
-TimeTrace never rewrites or enables extensions. Snapshot replay covers notification
-loss; an unavailable bridge fails closed rather than charging stale foreground.
+The bundled extension is installed and enabled when tracking starts in GNOME 51.
+Snapshot replay covers notification loss; an unavailable bridge fails closed
+rather than charging stale foreground.
 """
 import json
 import logging
 import time
 from collections.abc import Callable
 
+from timetrace.backends.gnome_extension import install_and_enable
+
 log = logging.getLogger(__name__)
 SERVICE = "org.gnome.Shell"
-PATH = "/org/timetrace/GnomeFork/Bridge"
-INTERFACE = "org.timetrace.GnomeFork.Bridge1"
+PATH = "/org/timetrace/Bridge"
+INTERFACE = "org.timetrace.Bridge1"
 
 
 class EventStream:
@@ -70,6 +72,7 @@ class GnomeSessionBackend:
         self._stopped = True
         self._unavailable = False
         self._last_state = None
+        self.extension_notice = None
         outer = self
 
         class Receiver(QObject):
@@ -93,6 +96,9 @@ class GnomeSessionBackend:
         self._poll()
 
     def start(self, on_window_changed):
+        self.extension_notice = install_and_enable()
+        if self.extension_notice:
+            log.warning(self.extension_notice)
         self._window = on_window_changed
         self._stopped = False
         if not self._bus.connect(SERVICE, PATH, INTERFACE, "Changed", self._receiver, self._slot):
@@ -107,7 +113,7 @@ class GnomeSessionBackend:
         if not self._bus.isConnected():
             if self._connection_name:
                 QDBusConnection.disconnectFromBus(self._connection_name)
-            self._connection_name = f"timetrace-gnome-fork-{id(self)}"
+            self._connection_name = f"timetrace-{id(self)}"
             self._bus = QDBusConnection.connectToBus(
                 QDBusConnection.BusType.SessionBus, self._connection_name)
             self._bus.connect(SERVICE, PATH, INTERFACE, "Changed", self._receiver, self._slot)
@@ -132,7 +138,13 @@ class GnomeSessionBackend:
             if time.monotonic() - self._last_seen > 3:
                 raise RuntimeError("GNOME heartbeat expired")
             self._unavailable = False
+            self.extension_notice = None
         except Exception as exc:
+            if self.extension_notice is None:
+                self.extension_notice = (
+                    "Расширение TimeTrace недоступно. Выйдите из сеанса GNOME и войдите снова; "
+                    "если это не поможет, проверьте расширения в настройках GNOME."
+                )
             if not self._unavailable:
                 log.warning("GNOME bridge unavailable: %s; foreground paused", exc)
                 self._unavailable = True

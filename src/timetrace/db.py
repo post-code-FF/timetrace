@@ -6,7 +6,7 @@ from datetime import date, datetime, time, timedelta, tzinfo
 from pathlib import Path
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS fork_tracking_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS tracking_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
 
 CREATE TABLE IF NOT EXISTS presence_intervals (
     id INTEGER PRIMARY KEY,
@@ -105,7 +105,7 @@ class Store:
 
     def checkpoint(self, ts: int) -> None:
         self._conn.execute(
-            "INSERT INTO fork_tracking_state VALUES ('heartbeat', ?) "
+            "INSERT INTO tracking_state VALUES ('heartbeat', ?) "
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (ts,)
         )
         self._commit()
@@ -194,7 +194,7 @@ class Store:
 
     def reconcile_open_intervals_on_startup(self, fallback_end_ts: int) -> None:
         heartbeat = self._conn.execute(
-            "SELECT value FROM fork_tracking_state WHERE key='heartbeat'"
+            "SELECT value FROM tracking_state WHERE key='heartbeat'"
         ).fetchone()
         cutoff = min(fallback_end_ts, heartbeat[0]) if heartbeat else fallback_end_ts
         with self.transaction():

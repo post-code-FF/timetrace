@@ -28,3 +28,10 @@ def test_disable_when_already_absent_does_not_raise(tmp_path):
     path = tmp_path / "timetrace.desktop"
     set_autostart_enabled(False, autostart_path=path)  # must not raise
     assert not path.exists()
+
+
+def test_default_autostart_launches_timetrace(tmp_path):
+    path = tmp_path / "timetrace.desktop"
+    set_autostart_enabled(True, autostart_path=path)
+    assert "Name=TimeTrace\n" in path.read_text()
+    assert "Exec=timetrace --minimized\n" in path.read_text()

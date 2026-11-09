@@ -28,6 +28,8 @@ def test_build_app_wires_window_coordinator_and_tray(tmp_path, monkeypatch):
 
     app, window, coordinator, tray, quit_app = build_app([])
 
+    assert app.desktopFileName() == "timetrace"
+    assert window.windowTitle() == "TimeTrace"
     assert window.isVisible() is False or window.isVisible() is True  # constructed without error
     assert coordinator is not None
     # A tray icon is only created where one can actually be shown (e.g. not
