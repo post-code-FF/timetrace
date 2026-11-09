@@ -58,9 +58,14 @@ jobs:
             useradd -m builder
             chown -R builder:builder /pkg
             su builder -s /bin/bash -c "cd /pkg && makepkg --nodeps --noconfirm"
+            cmp /pkg/pkg/timetrace-git/usr/bin/timetrace /pkg/timetrace-*-x86_64.bin
+            test "$(/pkg/pkg/timetrace-git/usr/bin/timetrace --version)" = "timetrace 0.1.5"
+            pacman -Qip /pkg/timetrace-git-*.pkg.tar.zst
           '
           cp arch-build/*.pkg.tar.zst release-assets/
-          tar --zstd -tf release-assets/*.pkg.tar.zst
+          for package in release-assets/*.pkg.tar.zst; do
+            tar --zstd -tf "$package"
+          done
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: linux-${{ matrix.variant }}

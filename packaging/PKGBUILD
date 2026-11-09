@@ -10,6 +10,7 @@ depends=()
 provides=('timetrace')
 conflicts=('timetrace')
 makedepends=('imagemagick')
+options=('!strip' '!debug')
 source_x86_64=("timetrace-${pkgver}-x86_64.bin::https://github.com/post-code-FF/timetrace/releases/download/v${pkgver}/timetrace-modern")
 sha256sums_x86_64=('18f7d0af447fc29eb4f60ddc9bbc43b63b130ec4a463faa29c6a5f077a67344c')
 
