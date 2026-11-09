@@ -26,12 +26,17 @@ jobs:
           docker run --rm -v "$PWD:/source" -w /source \
             "timetrace-build-${{ matrix.variant }}" bash -ec '
               apt-get update
-              apt-get install -y --no-install-recommends gjs dbus
+              apt-get install -y --no-install-recommends dbus
               uv pip install pytest pytest-qt
               python -m pytest -q
               TIMETRACE_PRIVATE_BUS_TEST=1 dbus-run-session -- python scripts/test-dbus-integration.py
               test "$(/build/packaging/dist/timetrace --version)" = "timetrace 0.1.5"
             '
+      - name: Test GNOME extension lifecycle with current GJS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gjs
+          gjs -m tests/extension-harness.js src/timetrace/assets/gnome_extension/extension.js
       - name: Build Debian and RPM packages
         run: |
           docker build -f packaging/docker/Dockerfile.fpm -t timetrace-fpm .
