@@ -20,8 +20,11 @@ def test_gnome_wayland_uses_mutter_backend():
     assert isinstance(backend, (MutterIdleMonitorBackend, NullIdleBackend))
 
 
-def test_kde_wayland_uses_ext_idle_notify_backend():
-    assert isinstance(select_idle_backend("kde", "wayland"), WaylandExtIdleNotifyBackend)
+def test_kde_wayland_uses_ext_idle_notify_backend(monkeypatch):
+    from timetrace.backends import idle_factory
+    sentinel = object()
+    monkeypatch.setattr(idle_factory, "WaylandExtIdleNotifyBackend", lambda: sentinel)
+    assert select_idle_backend("kde", "wayland") is sentinel
 
 
 def test_other_desktop_on_wayland_uses_null_backend():

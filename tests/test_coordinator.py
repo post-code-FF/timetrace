@@ -372,3 +372,85 @@ def test_start_reconciles_stale_open_intervals_from_previous_run(tmp_path):
     assert closed_stale[0].end_ts == 1000
     assert store.get_open_presence_interval().start_ts == 1000
     store.close()
+
+
+def test_focus_loss_closes_interval_and_never_counts_empty_application(tmp_path):
+    store, idle, window, c = make_coordinator(tmp_path, [1000, 5000])
+    c.start()
+    window.on_window_changed('firefox.desktop', None, 2000)
+    window.on_window_changed('', None, 3000)
+    c.process_pending_events()
+    assert store.get_open_app_interval() is None
+    rows = store.app_intervals_for_day(0, 10_000, 4000)
+    assert [(r.resource_class, r.start_ts, r.end_ts) for r in rows] == [('firefox.desktop', 2000, 3000)]
+    c.stop()
+    store.close()
+
+
+def test_duplicate_resume_does_not_create_overlapping_app_intervals(tmp_path):
+    store, idle, window, c = make_coordinator(tmp_path, [1000, 5000])
+    c.start()
+    window.on_window_changed('firefox', None, 2000)
+    idle.on_resume(2500)
+    idle.on_resume(3000)
+    c.process_pending_events()
+    c.stop()
+    rows = store.app_intervals_for_day(0, 10_000, 5000)
+    assert [(r.start_ts, r.end_ts) for r in rows] == [(2000, 5000)]
+    store.close()
+
+
+def test_idle_resume_during_suspend_cannot_reopen_foreground(tmp_path):
+    store, idle, window, sleep, c = make_coordinator_with_sleep(tmp_path, [1000, 10000])
+    c.start()
+    window.on_window_changed('editor', None, 2000)
+    sleep.on_sleep(3000)
+    idle.on_resume(4000)
+    c.process_pending_events()
+    assert store.get_open_app_interval() is None
+    assert store.get_open_presence_interval().state == 'sleep'
+    sleep.on_wake(8000)
+    c.process_pending_events()
+    assert store.get_open_app_interval().start_ts == 8000
+    c.stop()
+    store.close()
+
+
+class FakeSessionBackend(FakeWindowBackend):
+    def start_presence_monitor(self, threshold, callback):
+        self.presence = callback
+
+
+def test_gnome_lock_unlock_disconnect_and_reconnect_exact_totals(tmp_path):
+    store = Store(tmp_path / 'data.db')
+    window = FakeSessionBackend()
+    c = TrackingCoordinator(store, NullIdleBackend(), window, 5000, clock=lambda: 16000)
+    # Use a real start earlier than the synthetic transitions.
+    c._clock = lambda: 1000
+    c.start()
+    # First snapshot and focus, lock, unlock, bridge outage, recover.
+    for rc, blocked, ts in [('terminal.desktop', False, 2000), ('', True, 5000),
+                            ('firefox.desktop', False, 8000), ('', True, 11000),
+                            ('editor.desktop', False, 14000)]:
+        window.on_window_changed(rc, None, ts)
+        window.presence(False, blocked, ts)
+    c.process_pending_events()
+    c._clock = lambda: 16000
+    c.stop()
+    rows = store.app_intervals_for_day(0, 20000, 16000)
+    assert [(r.resource_class, r.end_ts-r.start_ts) for r in rows] == [
+        ('terminal.desktop', 3000), ('firefox.desktop', 3000), ('editor.desktop', 2000)]
+    assert sum(r.end_ts-r.start_ts for r in rows) == 8000
+    store.close()
+
+
+def test_queued_focus_switch_is_flushed_before_stop(tmp_path):
+    store, idle, window, c = make_coordinator(tmp_path, [1000, 4000])
+    c.start()
+    window.on_window_changed('terminal', None, 2000)
+    window.on_window_changed('editor', None, 3000)
+    c.stop()
+    rows = store.app_intervals_for_day(0, 10000, 4000)
+    assert [(r.resource_class, r.start_ts, r.end_ts) for r in rows] == [
+        ('terminal', 2000, 3000), ('editor', 3000, 4000)]
+    store.close()

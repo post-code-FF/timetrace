@@ -139,3 +139,29 @@ def test_sleep_state_allowed_on_a_database_created_before_it_existed(tmp_path):
     rows = store.presence_intervals_for_day(0, 10_000, now_ts=3000)
     assert {r.state for r in rows} == {"active", "sleep"}
     store.close()
+
+
+def test_crash_recovery_uses_checkpoint_not_time_of_next_launch(tmp_path):
+    store = Store(tmp_path / 'data.db')
+    store.open_app_interval('editor', None, 1000)
+    store.open_presence_interval('active', 1000)
+    store.checkpoint(5000)
+    store.close()
+    store = Store(tmp_path / 'data.db')
+    store.reconcile_open_intervals_on_startup(100000)
+    rows = store.app_intervals_for_day(0, 200000, 100000)
+    assert rows[0].end_ts == 5000
+    store.close()
+
+
+def test_atomic_transition_rolls_back_all_rows_on_failure(tmp_path):
+    import pytest
+    store = Store(tmp_path / 'data.db')
+    store.open_app_interval('terminal', None, 1000)
+    with pytest.raises(RuntimeError), store.transaction():
+        store.close_open_app_interval(2000)
+        store.open_app_interval('editor', None, 2000)
+        raise RuntimeError('simulated interruption')
+    assert store.get_open_app_interval().resource_class == 'terminal'
+    assert len(store.app_intervals_for_day(0, 10000, 3000)) == 1
+    store.close()

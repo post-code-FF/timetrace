@@ -1,4 +1,6 @@
 import sys
+import os
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -38,18 +40,20 @@ def build_app(argv: list[str]):
     from timetrace.ui.settings_dialog import SettingsDialog
     from timetrace.ui.tray import TrayIcon
 
+    logging.basicConfig(level=logging.DEBUG if os.getenv("TIMETRACE_DEBUG") == "1" else logging.WARNING,
+                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     app = QApplication.instance() or QApplication(argv)
     app.setQuitOnLastWindowClosed(False)
-    app.setDesktopFileName("timetrace")
+    app.setDesktopFileName("timetrace-gnome-fork")
     app.setWindowIcon(app_icon())
 
     bus = QDBusConnection.sessionBus()
     # Without a session bus (e.g. startx + a bare window manager) nobody else
     # can own the name either, so a failed registration only means "another
     # instance" when we are actually connected.
-    is_primary_instance = not bus.isConnected() or bus.registerService("org.timetrace.App")
+    is_primary_instance = not bus.isConnected() or bus.registerService("org.timetrace.GnomeFork.App")
     if not is_primary_instance:
-        iface = QDBusInterface("org.timetrace.App", "/App", "", bus)
+        iface = QDBusInterface("org.timetrace.GnomeFork.App", "/App", "", bus)
         iface.call("Raise")
         return app, None, None, None, None
 
@@ -91,6 +95,7 @@ def build_app(argv: list[str]):
     coordinator.start()
 
     window = MainWindow(store, tz=tz)
+    window.setWindowTitle("TimeTrace GNOME Fork")
 
     def open_settings() -> None:
         nonlocal config
@@ -99,7 +104,7 @@ def build_app(argv: list[str]):
             config_path=paths.config_file_path(),
             on_idle_threshold_changed=coordinator.update_idle_threshold,
             on_theme_changed=set_theme,
-            exec_path="timetrace",
+            exec_path=str(__import__("pathlib").Path(sys.executable).parent / "timetrace-gnome-fork"),
         )
         dialog.exec()
         config = load_config(paths.config_file_path())
@@ -112,10 +117,24 @@ def build_app(argv: list[str]):
     bus.registerObject("/App", raise_adaptor, QDBusConnection.RegisterOption.ExportAllSlots)
     window._raise_adaptor = raise_adaptor  # keep the QObject alive
 
-    def quit_app() -> None:
+    closed = False
+
+    def cleanup() -> None:
+        nonlocal closed
+        if closed:
+            return
+        closed = True
+        event_timer.stop()
+        refresh_timer.stop()
+        checkpoint_timer.stop()
         coordinator.stop()
         store.close()
+
+    def quit_app() -> None:
+        cleanup()
         app.quit()
+
+    app.aboutToQuit.connect(cleanup)
 
     # Stock GNOME Shell runs no org.freedesktop.StatusNotifierWatcher (tray
     # support there is an opt-in extension), so QSystemTrayIcon there just
@@ -134,6 +153,11 @@ def build_app(argv: list[str]):
     refresh_timer = QTimer()
     refresh_timer.timeout.connect(window.refresh)
     refresh_timer.start(5000)
+
+    checkpoint_timer = QTimer()
+    checkpoint_timer.timeout.connect(coordinator.checkpoint)
+    checkpoint_timer.start(1000)
+    window._checkpoint_timer = checkpoint_timer
 
     window._event_timer = event_timer  # keep references alive
     window._refresh_timer = refresh_timer

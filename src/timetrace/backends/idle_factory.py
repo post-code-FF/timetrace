@@ -1,5 +1,4 @@
 from timetrace.backends.idle_base import IdleBackend, NullIdleBackend
-from timetrace.backends.idle_gnome import MutterIdleMonitorBackend
 from timetrace.backends.idle_kde_wayland import WaylandExtIdleNotifyBackend
 from timetrace.backends.idle_x11 import X11ScreenSaverIdleBackend
 from timetrace.env_detect import DesktopEnv, SessionType
@@ -10,7 +9,7 @@ def select_idle_backend(desktop: DesktopEnv, session: SessionType) -> IdleBacken
         return X11ScreenSaverIdleBackend()
     if session == "wayland" and desktop == "gnome":
         try:
-            return MutterIdleMonitorBackend()
+            return NullIdleBackend()  # GNOME bridge supplies idle and lock together
         except Exception:
             return NullIdleBackend()
     if session == "wayland" and desktop == "kde":
