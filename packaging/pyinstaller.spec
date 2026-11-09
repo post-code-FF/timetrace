@@ -11,6 +11,7 @@ a = Analysis(
     pathex=["../src"],
     datas=datas,
     hiddenimports=["Xlib.ext.screensaver"],
+    excludes=["PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.QtWebEngineQuick", "pytest"],
 )
 
 # fontconfig и freetype должны быть системными. Упакованные из Ubuntu не
@@ -25,7 +26,7 @@ exe = EXE(
     a.scripts,
     a.binaries,
     a.datas,
-    name="timetrace",
+    name="timetrace-gnome-fork",
     console=False,
     onefile=True,
 )

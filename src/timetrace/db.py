@@ -1,10 +1,13 @@
 # src/timetrace/db.py
 import sqlite3
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, tzinfo
 from pathlib import Path
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS fork_tracking_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+
 CREATE TABLE IF NOT EXISTS presence_intervals (
     id INTEGER PRIMARY KEY,
     state TEXT NOT NULL CHECK(state IN ('active', 'idle', 'sleep')),
@@ -79,9 +82,33 @@ class Store:
         db_path = Path(db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(db_path)
+        self._in_transaction = False
         _migrate_presence_state_constraint(self._conn)
         self._conn.executescript(SCHEMA)
-        self._conn.commit()
+        self._commit()
+
+    def _commit(self) -> None:
+        if not self._in_transaction:
+            self._conn.commit()
+
+    @contextmanager
+    def transaction(self):
+        self._in_transaction = True
+        try:
+            yield
+            self._conn.commit()
+        except BaseException:
+            self._conn.rollback()
+            raise
+        finally:
+            self._in_transaction = False
+
+    def checkpoint(self, ts: int) -> None:
+        self._conn.execute(
+            "INSERT INTO fork_tracking_state VALUES ('heartbeat', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (ts,)
+        )
+        self._commit()
 
     def close(self) -> None:
         self._conn.close()
@@ -91,14 +118,14 @@ class Store:
             "INSERT INTO presence_intervals (state, start_ts, end_ts) VALUES (?, ?, NULL)",
             (state, start_ts),
         )
-        self._conn.commit()
+        self._commit()
         return cur.lastrowid
 
     def close_open_presence_interval(self, end_ts: int) -> None:
         self._conn.execute(
-            "UPDATE presence_intervals SET end_ts = ? WHERE end_ts IS NULL", (end_ts,)
+            "UPDATE presence_intervals SET end_ts = MAX(start_ts, ?) WHERE end_ts IS NULL", (end_ts,)
         )
-        self._conn.commit()
+        self._commit()
 
     def get_open_presence_interval(self) -> PresenceInterval | None:
         row = self._conn.execute(
@@ -112,14 +139,14 @@ class Store:
             "VALUES (?, ?, ?, NULL)",
             (resource_class, window_title, start_ts),
         )
-        self._conn.commit()
+        self._commit()
         return cur.lastrowid
 
     def close_open_app_interval(self, end_ts: int) -> None:
         self._conn.execute(
-            "UPDATE app_intervals SET end_ts = ? WHERE end_ts IS NULL", (end_ts,)
+            "UPDATE app_intervals SET end_ts = MAX(start_ts, ?) WHERE end_ts IS NULL", (end_ts,)
         )
-        self._conn.commit()
+        self._commit()
 
     def get_open_app_interval(self) -> AppInterval | None:
         row = self._conn.execute(
@@ -166,5 +193,11 @@ class Store:
         ]
 
     def reconcile_open_intervals_on_startup(self, fallback_end_ts: int) -> None:
-        self.close_open_presence_interval(fallback_end_ts)
-        self.close_open_app_interval(fallback_end_ts)
+        heartbeat = self._conn.execute(
+            "SELECT value FROM fork_tracking_state WHERE key='heartbeat'"
+        ).fetchone()
+        cutoff = min(fallback_end_ts, heartbeat[0]) if heartbeat else fallback_end_ts
+        with self.transaction():
+            self.close_open_presence_interval(cutoff)
+            self.close_open_app_interval(cutoff)
+            self.checkpoint(fallback_end_ts)

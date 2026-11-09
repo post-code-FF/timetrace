@@ -1,6 +1,8 @@
 {
-    "uuid": "timetrace@timetrace.app",
-    "name": "TimeTrace Active Window Reporter",
-    "description": "Reports the focused window's class/title to TimeTrace over D-Bus",
-    "shell-version": ["45", "46", "47", "48", "49", "50"]
+    "uuid": "timetrace-fork@local",
+    "name": "TimeTrace Fork GNOME Bridge",
+    "description": "Read-only focus, lock and idle state for the isolated TimeTrace fork",
+    "shell-version": ["51"],
+    "session-modes": ["user", "unlock-dialog"],
+    "version": 1
 }

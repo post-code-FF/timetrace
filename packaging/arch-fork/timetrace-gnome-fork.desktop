@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=TimeTrace GNOME Fork
+Comment=Screen time tracker with GNOME focus, idle and lock support
+Exec=timetrace-gnome-fork
+Icon=timetrace-gnome-fork
+Categories=Utility;
+Terminal=false
+StartupNotify=true

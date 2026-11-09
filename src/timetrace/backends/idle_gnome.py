@@ -13,7 +13,7 @@ class MutterIdleDBusConnector(Protocol):
     def remove_watch(self, watch_id: int) -> None: ...
 
 
-_GDBUS_REPLY_UINT_RE = re.compile(r"\(\s*(\d+)\s*,?\s*\)")
+_GDBUS_REPLY_UINT_RE = re.compile(r"\(\s*(?:uint32\s+|uint64\s+)?(\d+)\s*,?\s*\)")
 
 
 class QtMutterIdleDBusConnector:
@@ -81,7 +81,7 @@ class QtMutterIdleDBusConnector:
     @staticmethod
     def _parse_reply_uint(gdbus_output: str, method_name: str) -> int:
         # gdbus prints a successful reply as a GVariant tuple literal, e.g. "(5,)".
-        match = _GDBUS_REPLY_UINT_RE.match(gdbus_output)
+        match = _GDBUS_REPLY_UINT_RE.fullmatch(gdbus_output.strip())
         if not match:
             raise RuntimeError(f"{method_name}: unexpected gdbus reply {gdbus_output!r}")
         return int(match.group(1))

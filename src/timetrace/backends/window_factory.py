@@ -1,5 +1,5 @@
 from timetrace.backends.window_base import ActiveWindowBackend, NullActiveWindowBackend
-from timetrace.backends.window_gnome import GnomeShellExtensionBackend
+from timetrace.backends.session_gnome import GnomeSessionBackend
 from timetrace.backends.window_kwin import KWinScriptActiveWindowBackend
 from timetrace.backends.window_x11 import X11EwmhActiveWindowBackend
 from timetrace.env_detect import DesktopEnv, SessionType
@@ -18,7 +18,7 @@ def select_window_backend(desktop: DesktopEnv, session: SessionType) -> ActiveWi
             return NullActiveWindowBackend()
     if session == "wayland" and desktop == "gnome":
         try:
-            return GnomeShellExtensionBackend()
+            return GnomeSessionBackend()
         except Exception:
             return NullActiveWindowBackend()
     return NullActiveWindowBackend()

@@ -2,7 +2,7 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 
-APP_SLUG = "timetrace"
+APP_SLUG = "timetrace-gnome-fork"
 
 
 def _env(env: Mapping[str, str] | None) -> Mapping[str, str]:

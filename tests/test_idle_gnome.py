@@ -218,3 +218,8 @@ def test_parse_reply_uint_raises_on_unexpected_output():
         raised = True
         assert "AddIdleWatch" in str(exc)
     assert raised
+
+
+def test_typed_gvariant_reply_regression_from_real_gnome51_log():
+    assert QtMutterIdleDBusConnector._parse_reply_uint('(uint32 5,)', 'AddIdleWatch') == 5
+    assert QtMutterIdleDBusConnector._parse_reply_uint('(uint64 5000,)', 'GetIdletime') == 5000
