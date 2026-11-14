@@ -82,3 +82,18 @@ def test_main_window_settings_button_emits_signal(qtbot, tmp_path):
     with qtbot.waitSignal(window.settingsRequested, timeout=1000):
         window._settings_button.click()
     store.close()
+
+
+def test_idle_segment_uses_away_label_and_same_red_as_sleep(qtbot, tmp_path):
+    from timetrace.ui.timeline_widget import intervals_to_segments
+    store = Store(tmp_path / 'data.db')
+    now = datetime(2026, 11, 14, 12, tzinfo=UTC)
+    start = int(now.timestamp() * 1000) - 60000
+    store.open_presence_interval('idle', start)
+    window = MainWindow(store, tz=UTC, now_provider=lambda: now)
+    qtbot.addWidget(window)
+    intervals = window.presence_track._intervals
+    assert intervals[0][2] == (219, 68, 55)
+    segment = intervals_to_segments(intervals, start, start + 60000, 100)[0]
+    assert window.presence_track._segment_tooltip(segment).startswith('Не у компьютера\n')
+    store.close()

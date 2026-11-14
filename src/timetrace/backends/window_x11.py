@@ -20,6 +20,12 @@ class RealX11Client:
         self._net_active_window = self._display.intern_atom("_NET_ACTIVE_WINDOW")
         self._net_wm_pid = self._display.intern_atom("_NET_WM_PID")
         self._wm_class_atom = self._display.intern_atom("WM_CLASS")
+        self._net_wm_state = self._display.intern_atom("_NET_WM_STATE")
+        self._fullscreen_atom = self._display.intern_atom("_NET_WM_STATE_FULLSCREEN")
+        self._window_type = self._display.intern_atom("_NET_WM_WINDOW_TYPE")
+        self._shell_types = {self._display.intern_atom("_NET_WM_WINDOW_TYPE_" + name)
+                             for name in ("DESKTOP", "DOCK", "NOTIFICATION", "TOOLTIP")}
+        self._fullscreen = False
         self._root.change_attributes(event_mask=X.PropertyChangeMask)
         # change_attributes only queues the request; without a round trip the
         # event mask never reaches the server and no change events ever arrive.
@@ -40,6 +46,7 @@ class RealX11Client:
         return changed
 
     def get_active_window_info(self) -> tuple[str, str | None] | None:
+        self._fullscreen = False
         prop = self._root.get_full_property(self._net_active_window, 0)
         if not prop or not prop.value:
             return None
@@ -47,11 +54,18 @@ class RealX11Client:
         if not window_id:
             return None
         window = self._display.create_resource_object("window", window_id)
+        state = window.get_full_property(self._net_wm_state, 0)
+        window_type = window.get_full_property(self._window_type, 0)
+        shell_surface = window_type is not None and bool(self._shell_types.intersection(window_type.value))
+        self._fullscreen = bool(state is not None and self._fullscreen_atom in state.value and not shell_surface)
         wm_class = window.get_wm_class()
         resource_class = wm_class[1] if wm_class else "unknown"
         wm_name = window.get_wm_name()
         title = wm_name if isinstance(wm_name, str) else None
         return resource_class, title
+
+    def get_active_window_fullscreen(self) -> bool:
+        return self._fullscreen
 
     def close(self) -> None:
         self._display.close()
@@ -63,27 +77,35 @@ class X11EwmhActiveWindowBackend:
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
 
+    def start_fullscreen_monitor(self, callback: Callable[[bool, int], None]) -> None:
+        self._on_fullscreen = callback
+
     def start(self, on_window_changed: Callable[[str, str | None, int], None]) -> None:
         self._stop_event.clear()
 
         def loop() -> None:
+            previous = (None, False)
             try:
-                try:
-                    info = self._client.get_active_window_info()
-                    if info is not None:
-                        on_window_changed(info[0], info[1], int(time.time() * 1000))
-                except Exception:
-                    pass
                 while not self._stop_event.is_set():
                     try:
-                        changed = self._client.wait_for_active_window_change(0.5)
-                        if changed and not self._stop_event.is_set():
-                            info = self._client.get_active_window_info()
-                            if info is not None:
-                                resource_class, title = info
-                                on_window_changed(resource_class, title, int(time.time() * 1000))
+                        info = self._client.get_active_window_info()
+                        get_fullscreen = getattr(self._client, "get_active_window_fullscreen", lambda: False)
+                        fullscreen = bool(info and get_fullscreen())
+                        snapshot = (info, fullscreen)
+                        if snapshot != previous:
+                            ts = int(time.time() * 1000)
+                            on_window_changed(info[0] if info else "", info[1] if info else None, ts)
+                            if getattr(self, "_on_fullscreen", None):
+                                self._on_fullscreen(fullscreen, ts)
+                            previous = snapshot
                     except Exception:
-                        continue
+                        pass
+                    # Re-sample on timeout too: fullscreen can change without
+                    # changing _NET_ACTIVE_WINDOW (YouTube's fullscreen button).
+                    try:
+                        self._client.wait_for_active_window_change(0.5)
+                    except Exception:
+                        self._stop_event.wait(0.5)
             finally:
                 self._client.close()
 

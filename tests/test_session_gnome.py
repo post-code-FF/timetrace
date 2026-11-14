@@ -34,7 +34,7 @@ def test_backward_clock_never_produces_negative_intervals():
     assert list(stream.decode(packet(seq=2, ts=1000)))[0]['ts'] == 2000
 
 
-@pytest.mark.parametrize('update', [dict(version=2), dict(idle_ms='bad'), dict(locked=1)])
+@pytest.mark.parametrize('update', [dict(version=2), dict(idle_ms='bad'), dict(locked=1), dict(fullscreen=1)])
 def test_rejects_invalid_protocol(update):
     with pytest.raises(ValueError):
         list(EventStream().decode(packet(**update)))
@@ -101,3 +101,43 @@ def test_start_installs_bundled_extension(qtbot, tmp_path, monkeypatch):
         assert 'GetEvents' in installed.read_text()
     finally:
         backend.stop()
+
+
+def test_fullscreen_exempts_idle_but_never_lock_or_missing_bridge():
+    backend = GnomeSessionBackend.__new__(GnomeSessionBackend)
+    presence = []
+    backend._window = None
+    backend._presence = lambda *args: presence.append(args)
+    backend._threshold = 5000
+    backend._last_state = None
+    for seq, change in enumerate([
+        dict(fullscreen=True), dict(fullscreen=False),
+        dict(fullscreen=True, locked=True), dict(fullscreen=True, available=False),
+    ], 1):
+        backend._accept(json.loads(packet(seq=seq, ts=seq*1000, idle_ms=7000, **change))['events'][0])
+    assert presence == [(False, False, 1000), (True, False, 2000), (False, True, 3000)]
+
+
+def test_old_loaded_extension_keeps_upgrade_notice_until_fullscreen_is_supported(qtbot):
+    from PySide6.QtDBus import QDBusMessage
+    backend = GnomeSessionBackend()
+    backend._stopped = False
+    backend.extension_notice = 'Выйдите из сеанса GNOME и войдите снова.'
+
+    class Reply:
+        def __init__(self, payload):
+            self.payload = payload
+        def reply(self):
+            return self
+        def type(self):
+            return QDBusMessage.MessageType.ReplyMessage
+        def arguments(self):
+            return [self.payload]
+        def deleteLater(self):
+            pass
+
+    backend._reply(Reply(packet()))
+    assert backend.extension_notice and 'GNOME' in backend.extension_notice
+    backend._reply(Reply(packet(seq=2, fullscreen=False)))
+    assert backend.extension_notice is None
+    backend.stop()

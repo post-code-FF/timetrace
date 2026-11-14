@@ -30,13 +30,14 @@ jobs:
               uv pip install pytest pytest-qt
               python -m pytest -q
               TIMETRACE_PRIVATE_BUS_TEST=1 dbus-run-session -- python scripts/test-dbus-integration.py
-              test "$(/build/packaging/dist/timetrace --version)" = "timetrace 0.1.5"
+              test "$(/build/packaging/dist/timetrace --version)" = "timetrace 0.1.6"
             '
       - name: Test GNOME extension lifecycle with current GJS
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gjs
           gjs -m tests/extension-harness.js src/timetrace/assets/gnome_extension/extension.js
+          gjs tests/kwin-harness.js src/timetrace/assets/kwin_script/contents/code/main.js
       - name: Build Debian and RPM packages
         run: |
           docker build -f packaging/docker/Dockerfile.fpm -t timetrace-fpm .
@@ -59,7 +60,7 @@ jobs:
             chown -R builder:builder /pkg
             su builder -s /bin/bash -c "cd /pkg && makepkg --nodeps --noconfirm"
             cmp /pkg/pkg/timetrace-git/usr/bin/timetrace /pkg/timetrace-*-x86_64.bin
-            test "$(/pkg/pkg/timetrace-git/usr/bin/timetrace --version)" = "timetrace 0.1.5"
+            test "$(/pkg/pkg/timetrace-git/usr/bin/timetrace --version)" = "timetrace 0.1.6"
             pacman -Qip /pkg/timetrace-git-*.pkg.tar.zst
           '
           cp arch-build/*.pkg.tar.zst release-assets/

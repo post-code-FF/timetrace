@@ -27,7 +27,7 @@ function assert(value, why) { if (!value) throw Error(why); }
 bridge.enable();
 function current() {return JSON.parse(bridge.GetEvents('')).events[0];}
 assert(current().app_id === '', 'Initial empty focus must be represented');
-display.focus_window = {app: {get_id() {return 'firefox.desktop';}}, get_title() {return 'Firefox';}};
+display.focus_window = {app: {get_id() {return 'firefox.desktop';}}, get_title() {return 'Firefox';}, is_fullscreen() {return false;}, minimized: false};
 bridge._sample();
 assert(current().app_id === 'firefox.desktop', 'Desktop ID');
 mode.isLocked = true;
@@ -37,7 +37,14 @@ mode.isLocked = false;
 idle = 7000;
 bridge._sample();
 assert(current().idle_ms === 7000, 'Mutter idle');
-assert(JSON.parse(bridge.GetEvents('test:1')).events.length === 3, 'Replay');
+assert(current().fullscreen === false, 'Normal window');
+display.focus_window.is_fullscreen = () => true;
+bridge._sample();
+assert(current().fullscreen === true, 'Fullscreen without a focus switch');
+display.focus_window.minimized = true;
+bridge._sample();
+assert(current().fullscreen === false, 'Minimized fullscreen is not exempt');
+assert(JSON.parse(bridge.GetEvents('test:1')).events.length === 5, 'Replay');
 for (let i = 0; i < 610; i++) bridge._sample();
 assert(JSON.parse(bridge.GetEvents('test:1')).overflow, 'Bounded history overflow');
 bridge.disable();

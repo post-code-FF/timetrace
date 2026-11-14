@@ -33,6 +33,7 @@ class TrackingCoordinator:
         self._queue: queue.Queue = queue.Queue()
 
         self._idle = False
+        self._fullscreen = False
         self._sleeping = False
         self._blocked = False
         self._stopped = False
@@ -49,6 +50,10 @@ class TrackingCoordinator:
 
         self._presence_state = "idle" if self._blocked else "active"
         self._store.open_presence_interval(self._presence_state, now_ts)
+        if hasattr(self._window_backend, "start_fullscreen_monitor"):
+            self._window_backend.start_fullscreen_monitor(
+                lambda fullscreen, ts: self._queue.put(("fullscreen", fullscreen, ts)),
+            )
         if hasattr(self._window_backend, "start_presence_monitor"):
             self._window_backend.start_presence_monitor(
                 self._threshold_ms,
@@ -120,6 +125,9 @@ class TrackingCoordinator:
         elif kind == "session":
             self._idle, self._blocked = event[1], event[2]
             self._refresh_presence(event[3])
+        elif kind == "fullscreen":
+            self._fullscreen = event[1]
+            self._refresh_presence(event[2])
         elif kind == "window":
             self._on_window_changed(event[1], event[2], event[3])
 
@@ -136,7 +144,8 @@ class TrackingCoordinator:
         self._refresh_presence(ts)
 
     def _refresh_presence(self, ts: int) -> None:
-        state = "sleep" if self._sleeping else ("idle" if self._idle or self._blocked else "active")
+        away = self._blocked or (self._idle and not self._fullscreen)
+        state = "sleep" if self._sleeping else ("idle" if away else "active")
         if state == self._presence_state:
             return
         if self._open_app_resource_class is not None:

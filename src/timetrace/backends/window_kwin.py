@@ -66,7 +66,7 @@ class QtKWinScriptLoader:
 
 
 class TimeTraceDBusService(Protocol):
-    def register(self, on_report: Callable[[str, str, int], None]) -> None: ...
+    def register(self, on_report: Callable[..., None]) -> None: ...
     def unregister(self) -> None: ...
 
 
@@ -90,7 +90,7 @@ class _TimeTraceDBusAdaptor(QDBusAbstractAdaptor):
     qdbus introspection and a live ReportActiveWindow call.
     """
 
-    def __init__(self, parent: QObject, on_report: Callable[[str, str, int], None]) -> None:
+    def __init__(self, parent: QObject, on_report: Callable[..., None]) -> None:
         super().__init__(parent)
         self._on_report = on_report
 
@@ -98,10 +98,14 @@ class _TimeTraceDBusAdaptor(QDBusAbstractAdaptor):
     def ReportActiveWindow(self, resource_class: str, title: str, pid: int) -> None:
         self._on_report(resource_class, title, pid)
 
+    @Slot(str, str, int, bool)
+    def ReportWindowState(self, resource_class: str, title: str, pid: int, fullscreen: bool) -> None:
+        self._on_report(resource_class, title, pid, fullscreen)
+
 
 class QtTimeTraceDBusService:
     """Registers org.timetrace.App on the session bus and exposes
-    /ActiveWindow org.timetrace.ActiveWindow.ReportActiveWindow(ss i)."""
+    /ActiveWindow with legacy ReportActiveWindow(ssi) and ReportWindowState(ssib)."""
 
     def __init__(self) -> None:
         from PySide6.QtDBus import QDBusConnection
@@ -110,7 +114,7 @@ class QtTimeTraceDBusService:
         self._target: QObject | None = None
         self._adaptor: _TimeTraceDBusAdaptor | None = None
 
-    def register(self, on_report: Callable[[str, str, int], None]) -> None:
+    def register(self, on_report: Callable[..., None]) -> None:
         from PySide6.QtDBus import QDBusConnection
 
         self._target = QObject()
@@ -142,10 +146,17 @@ class KWinScriptActiveWindowBackend:
         self._service = dbus_service or QtTimeTraceDBusService()
         self._loader = script_loader or QtKWinScriptLoader()
         self._script_id: int | None = None
+        self._on_fullscreen = None
+
+    def start_fullscreen_monitor(self, callback: Callable[[bool, int], None]) -> None:
+        self._on_fullscreen = callback
 
     def start(self, on_window_changed: Callable[[str, str | None, int], None]) -> None:
-        def on_report(resource_class: str, title: str, pid: int) -> None:
-            on_window_changed(resource_class, title or None, int(time.time() * 1000))
+        def on_report(resource_class: str, title: str, pid: int, fullscreen: bool = False) -> None:
+            ts = int(time.time() * 1000)
+            on_window_changed(resource_class, title or None, ts)
+            if self._on_fullscreen:
+                self._on_fullscreen(fullscreen, ts)
 
         self._service.register(on_report)
         self._script_id = self._loader.load_and_start(_bundled_script_path())

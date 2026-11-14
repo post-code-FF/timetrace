@@ -59,6 +59,7 @@ export default class TimeTraceBridge extends Extension {
             ts: Math.floor(GLib.get_real_time() / 1000),
             mono: Math.floor(GLib.get_monotonic_time() / 1000),
             available, locked: Boolean(locked), idle_ms: this._idleMonitor.get_idletime(),
+            fullscreen: Boolean(win?.is_fullscreen() && !win.minimized),
             app_id: available ? appId.slice(0, 1024) : '', title: (win?.get_title() || '').slice(0, 4096),
         };
         this._events.push(event);

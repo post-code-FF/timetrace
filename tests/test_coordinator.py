@@ -454,3 +454,84 @@ def test_queued_focus_switch_is_flushed_before_stop(tmp_path):
     assert [(r.resource_class, r.start_ts, r.end_ts) for r in rows] == [
         ('terminal', 2000, 3000), ('editor', 3000, 4000)]
     store.close()
+
+
+class FakeFullscreenWindowBackend(FakeWindowBackend):
+    def start_fullscreen_monitor(self, callback):
+        self.fullscreen = callback
+
+
+def test_fullscreen_exempts_idle_until_fullscreen_ends(tmp_path):
+    store = Store(tmp_path / 'data.db')
+    idle, window = FakeIdleBackend(), FakeFullscreenWindowBackend()
+    c = TrackingCoordinator(store, idle, window, 5000, clock=lambda: 1000)
+    c.start()
+    window.on_window_changed('firefox', 'YouTube', 2000)
+    window.fullscreen(True, 2000)
+    idle.on_idle(7000)
+    c.process_pending_events()
+    assert store.get_open_presence_interval().state == 'active'
+    assert store.get_open_app_interval().start_ts == 2000
+    window.fullscreen(False, 9000)
+    c.process_pending_events()
+    assert store.get_open_presence_interval().state == 'idle'
+    assert store.get_open_presence_interval().start_ts == 9000
+    assert store.get_open_app_interval() is None
+    idle.on_resume(10000)
+    c.process_pending_events()
+    assert store.get_open_presence_interval().state == 'active'
+    assert store.get_open_app_interval().start_ts == 10000
+    store.close()
+
+
+def test_fullscreen_cannot_override_sleep_or_blocked_session(tmp_path):
+    store = Store(tmp_path / 'data.db')
+    idle, window, sleep = FakeIdleBackend(), FakeFullscreenWindowBackend(), FakeSleepBackend()
+    c = TrackingCoordinator(store, idle, window, 5000, clock=lambda: 1000, sleep_backend=sleep)
+    c.start()
+    window.fullscreen(True, 2000)
+    idle.on_idle(7000)
+    sleep.on_sleep(8000)
+    c.process_pending_events()
+    assert store.get_open_presence_interval().state == 'sleep'
+    sleep.on_wake(9000)
+    c._queue.put(('session', True, True, 9000))
+    c.process_pending_events()
+    assert store.get_open_presence_interval().state == 'idle'
+    store.close()
+
+
+def test_background_window_and_title_changes_do_not_end_idle(tmp_path):
+    store, idle, window, c = make_coordinator(tmp_path, [1000])
+    c.start()
+    idle.on_idle(6000)
+    for ts in (7000, 8000, 9000):
+        window.on_window_changed('plasmashell', f'Wallpaper or notification {ts}', ts)
+    c.process_pending_events()
+    assert store.get_open_presence_interval().state == 'idle'
+    assert store.get_open_presence_interval().start_ts == 6000
+    assert store.get_open_app_interval() is None
+    store.close()
+
+
+def test_input_during_fullscreen_clears_idle_before_leaving_fullscreen(tmp_path):
+    store = Store(tmp_path / 'data.db')
+    idle, window = FakeIdleBackend(), FakeFullscreenWindowBackend()
+    c = TrackingCoordinator(store, idle, window, 5000, clock=lambda: 1000)
+    c.start()
+    idle.on_idle(6000)
+    c.process_pending_events()
+    assert store.get_open_presence_interval().state == 'idle'
+    window.fullscreen(True, 7000)
+    c.process_pending_events()
+    assert store.get_open_presence_interval().state == 'active'
+    idle.on_resume(8000)
+    window.fullscreen(False, 9000)
+    c.process_pending_events()
+    assert store.get_open_presence_interval().state == 'active'
+    assert store.get_open_presence_interval().start_ts == 7000
+    idle.on_idle(13000)
+    c.process_pending_events()
+    assert store.get_open_presence_interval().state == 'idle'
+    assert store.get_open_presence_interval().start_ts == 13000
+    store.close()

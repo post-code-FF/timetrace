@@ -62,3 +62,16 @@ def test_stop_unloads_script_and_unregisters_service():
     backend.stop()
     assert loader.unloaded_ids == [42]
     assert service.unregistered is True
+
+
+def test_fullscreen_reports_include_same_window_toggles_and_focus_loss():
+    service, loader = FakeDBusService(), FakeScriptLoader()
+    backend = KWinScriptActiveWindowBackend(service, loader)
+    events, windows = [], []
+    backend.start_fullscreen_monitor(lambda *args: events.append(args))
+    backend.start(lambda *args: windows.append(args))
+    service.on_report('firefox', 'YouTube', 1234, False)
+    service.on_report('firefox', 'YouTube', 1234, True)
+    service.on_report('', '', 0, False)
+    assert [e[0] for e in events] == [False, True, False]
+    assert [w[0] for w in windows] == ['firefox', 'firefox', '']

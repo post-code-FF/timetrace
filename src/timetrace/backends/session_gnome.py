@@ -44,6 +44,7 @@ class EventStream:
                     or type(e.get("idle_ms")) is not int
                     or type(e.get("locked")) is not bool or type(e.get("available")) is not bool
                     or not isinstance(e.get("app_id"), str)
+                    or type(e.get("fullscreen", False)) is not bool
                     or not isinstance(e.get("title"), str)):
                 raise ValueError("invalid GNOME event")
             if e["epoch"] == self.epoch and e["seq"] <= self.seq:
@@ -72,6 +73,7 @@ class GnomeSessionBackend:
         self._stopped = True
         self._unavailable = False
         self._last_state = None
+        self._fullscreen_supported = False
         self.extension_notice = None
         outer = self
 
@@ -138,7 +140,10 @@ class GnomeSessionBackend:
             if time.monotonic() - self._last_seen > 3:
                 raise RuntimeError("GNOME heartbeat expired")
             self._unavailable = False
-            self.extension_notice = None
+            self.extension_notice = None if self._fullscreen_supported else (
+                "Для учёта полноэкранных приложений выйдите из сеанса GNOME и войдите снова: "
+                "в памяти ещё работает предыдущее расширение TimeTrace."
+            )
         except Exception as exc:
             if self.extension_notice is None:
                 self.extension_notice = (
@@ -159,6 +164,7 @@ class GnomeSessionBackend:
             watcher.deleteLater()
 
     def _accept(self, e):
+        self._fullscreen_supported = "fullscreen" in e
         if e.get("gap_since") is not None:
             if self._presence:
                 self._presence(False, True, e["gap_since"])
@@ -167,7 +173,7 @@ class GnomeSessionBackend:
             self._last_state = None
         # Idle API returning -1 means unsupported, not active. Fail closed.
         blocked = not e["available"] or e["locked"] or e["idle_ms"] < 0
-        idle = e["idle_ms"] >= self._threshold
+        idle = e["idle_ms"] >= self._threshold and not e.get("fullscreen", False)
         state = (blocked, idle)
         # Queue focus first; coordinator's gate handles blocked transitions.
         if self._window:

@@ -1,6 +1,6 @@
 # Maintainer: <name> <email>
 pkgname=timetrace-git
-pkgver=0.1.5
+pkgver=0.1.6
 pkgrel=1
 pkgdesc="Time tracker for Linux: any desktop on X11, KDE & GNOME on Wayland"
 arch=('x86_64')
@@ -12,7 +12,7 @@ conflicts=('timetrace')
 makedepends=('imagemagick')
 options=('!strip' '!debug')
 source_x86_64=("timetrace-${pkgver}-x86_64.bin::https://github.com/post-code-FF/timetrace/releases/download/v${pkgver}/timetrace-modern")
-sha256sums_x86_64=('9d93b96974ce6c43f84c4ff1b5f44c331ecde8a0ac6ce22156793383769ae4de')
+sha256sums_x86_64=('60756e4333190b62b5ffa8c6adfa6acaa7d428c8ff8e66be4272a9c4058ddd0e')
 
 package() {
     install -Dm755 "${srcdir}/timetrace-${pkgver}-x86_64.bin" "${pkgdir}/usr/bin/timetrace"

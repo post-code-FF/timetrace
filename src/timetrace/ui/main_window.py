@@ -22,7 +22,7 @@ from timetrace.ui.time_ruler import TimeRulerWidget
 from timetrace.ui.timeline_widget import TimelineTrackWidget
 
 PRESENCE_COLORS = {"active": (46, 204, 64), "idle": (219, 68, 55), "sleep": (219, 68, 55)}
-PRESENCE_LABELS = {"active": "Активен", "idle": "Простой", "sleep": "Спящий режим"}
+PRESENCE_LABELS = {"active": "Активен", "idle": "Не у компьютера", "sleep": "Спящий режим"}
 
 
 class MainWindow(QMainWindow):

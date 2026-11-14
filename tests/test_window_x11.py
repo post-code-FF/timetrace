@@ -72,3 +72,26 @@ def test_reports_window_that_is_already_active_at_start():
     backend.stop()
 
     assert events == [("firefox", "Mozilla Firefox"), ("code", "Visual Studio Code")]
+
+
+def test_fullscreen_changes_are_reported_without_focus_change():
+    class Client(FakeX11Client):
+        def __init__(self):
+            super().__init__([], initial=('firefox', 'YouTube'))
+            self.states = iter([False, True, False])
+            self.fullscreen = False
+        def get_active_window_info(self):
+            self.fullscreen = next(self.states, False)
+            return self._current
+        def get_active_window_fullscreen(self):
+            return self.fullscreen
+    client = Client()
+    backend = X11EwmhActiveWindowBackend(client)
+    events = []
+    backend.start_fullscreen_monitor(lambda full, ts: events.append(full))
+    backend.start(lambda *args: None)
+    deadline = time.monotonic() + 2
+    while len(events) < 3 and time.monotonic() < deadline:
+        time.sleep(0.02)
+    backend.stop()
+    assert events[:3] == [False, True, False]
