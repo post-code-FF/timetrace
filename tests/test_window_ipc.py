@@ -45,6 +45,12 @@ def test_hyprland_json_preserves_commas_unicode_and_fullscreen(server):
     assert HyprlandReader(path)() == ("firefox", "Привет, мир", True)
 
 
+@pytest.mark.parametrize("mode,fullscreen", [(0, False), (1, False), (2, True), (False, False), (True, True)])
+def test_hyprland_maximized_window_does_not_exempt_idle(server, mode, fullscreen):
+    path = server({"class": "editor", "title": "file", "fullscreen": mode}, b"j/activewindow")
+    assert HyprlandReader(path)() == ("editor", "file", fullscreen)
+
+
 def test_niri_handles_focused_window_and_empty_workspace(server):
     path = server({"Ok": {"FocusedWindow": {"app_id": "terminal", "title": None}}}, b'"FocusedWindow"\n')
     assert NiriReader(path)() == ("terminal", None, False)

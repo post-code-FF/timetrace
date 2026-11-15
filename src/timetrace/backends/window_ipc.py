@@ -34,8 +34,12 @@ class HyprlandReader:
 
     def __call__(self):
         window = _request(self.path, b"j/activewindow")
+        mode = window.get("fullscreen", 0)
+        # Hyprland's numeric enum: 1 is maximized, 2 is fullscreen. Preserve
+        # boolean replies without treating maximization as an idle inhibitor.
+        fullscreen = mode is True or (type(mode) is int and mode == 2)
         return (window.get("class") or "", window.get("title") or None,
-                bool(window.get("fullscreen")))
+                fullscreen)
 
 
 class NiriReader:
