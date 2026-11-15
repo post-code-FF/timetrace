@@ -3,6 +3,8 @@ import threading
 import time
 from typing import Callable, Protocol
 
+from timetrace.backends.wayland_connection import roundtrip
+
 
 class ExtIdleClient(Protocol):
     def get_notification(
@@ -19,6 +21,7 @@ class PywaylandExtIdleClient:
         from pywayland.client import Display
 
         from timetrace._wayland_protocols.ext_idle_notify_v1 import ExtIdleNotifierV1
+        from timetrace._wayland_protocols.kde_idle import OrgKdeKwinIdle
 
         self._display = Display()
         self._display.connect()
@@ -34,16 +37,23 @@ class PywaylandExtIdleClient:
                 from timetrace._wayland_protocols.wayland import WlSeat
 
                 self._state["seat"] = registry.bind(id_, WlSeat, min(version, WlSeat.version))
+            elif interface == "org_kde_kwin_idle":
+                self._state["legacy_notifier"] = registry.bind(id_, OrgKdeKwinIdle, 1)
 
         registry.dispatcher["global"] = handle_global
-        self._display.roundtrip()
+        try:
+            roundtrip(self._display)
+        except Exception:
+            self._display.disconnect()
+            raise
 
         try:
-            self._notifier = self._state["notifier"]
+            self._using_legacy = "notifier" not in self._state
+            self._notifier = self._state["legacy_notifier" if self._using_legacy else "notifier"]
             self._seat = self._state["seat"]
         except KeyError:
             self._display.disconnect()
-            raise RuntimeError("Compositor does not support ext-idle-notify or wl_seat")
+            raise RuntimeError("Compositor does not support ext/KDE idle notification or wl_seat")
         self._stop_event = threading.Event()
         self._lock = threading.RLock()
         self._dispatch_thread = threading.Thread(target=self._dispatch_loop, daemon=True)
@@ -63,17 +73,23 @@ class PywaylandExtIdleClient:
         with self._lock:
             # v2 ignores idle inhibitors from unrelated/background surfaces.
             # Fullscreen exemptions are applied explicitly by the coordinator.
-            request = (self._notifier.get_input_idle_notification if self._notifier_version >= 2
-                       else self._notifier.get_idle_notification)
-            notification = request(timeout_ms, self._seat)
-            notification.dispatcher["idled"] = lambda n: on_idled()
+            if self._using_legacy:
+                notification = self._notifier.get_idle_timeout(self._seat, timeout_ms)
+            else:
+                request = (self._notifier.get_input_idle_notification if self._notifier_version >= 2
+                           else self._notifier.get_idle_notification)
+                notification = request(timeout_ms, self._seat)
+            notification.dispatcher["idle" if self._using_legacy else "idled"] = lambda n: on_idled()
             notification.dispatcher["resumed"] = lambda n: on_resumed()
             self._display.flush()
         return notification
 
     def destroy_notification(self, handle) -> None:
         with self._lock:
-            handle.destroy()
+            if self._using_legacy:
+                handle.release()
+            else:
+                handle.destroy()
             self._display.flush()
 
     def stop(self) -> None:

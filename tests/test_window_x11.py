@@ -4,6 +4,34 @@ from timetrace.backends.window_base import NullActiveWindowBackend
 from timetrace.backends.window_x11 import X11EwmhActiveWindowBackend
 
 
+def test_icccm_focus_climbs_child_to_client_and_rejects_pointer_root():
+    from types import SimpleNamespace
+    from timetrace.backends.window_x11 import RealX11Client
+
+    root = SimpleNamespace(id=10)
+
+    class Window:
+        def __init__(self, id_, parent, wm_class=None):
+            self.id, self.parent, self.wm_class = id_, parent, wm_class
+        def get_wm_class(self):
+            return self.wm_class
+        def get_full_property(self, atom, type_):
+            return None
+        def query_tree(self):
+            return SimpleNamespace(parent=self.parent)
+
+    client = Window(20, root, ("term", "Terminal"))
+    child = Window(30, client)
+    real = object.__new__(RealX11Client)
+    real._root = root
+    real._wm_state = 99
+    real._display = SimpleNamespace(get_input_focus=lambda: SimpleNamespace(focus=child))
+    assert real._input_focus_window() is client
+    for invalid in (0, 1, root):
+        real._display = SimpleNamespace(get_input_focus=lambda: SimpleNamespace(focus=invalid))
+        assert real._input_focus_window() is None
+
+
 def test_null_backend_is_inert():
     b = NullActiveWindowBackend()
     calls = []

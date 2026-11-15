@@ -27,9 +27,22 @@ def test_kde_wayland_uses_ext_idle_notify_backend(monkeypatch):
     assert select_idle_backend("kde", "wayland") is sentinel
 
 
-def test_other_desktop_on_wayland_uses_null_backend():
-    assert isinstance(select_idle_backend("other", "wayland"), NullIdleBackend)
+def test_other_desktop_on_wayland_uses_generic_idle_protocol(monkeypatch):
+    from timetrace.backends import idle_factory
+    sentinel = object()
+    monkeypatch.setattr(idle_factory, "WaylandExtIdleNotifyBackend", lambda: sentinel)
+    assert select_idle_backend("other", "wayland") is sentinel
 
 
 def test_unknown_session_uses_null_backend():
     assert isinstance(select_idle_backend("kde", "unknown"), NullIdleBackend)
+
+
+def test_missing_wayland_idle_api_is_visible(monkeypatch):
+    from timetrace.backends import idle_factory
+    def unavailable():
+        raise RuntimeError("no ext idle notifier")
+    monkeypatch.setattr(idle_factory, "WaylandExtIdleNotifyBackend", unavailable)
+    backend = select_idle_backend("other", "wayland")
+    assert isinstance(backend, NullIdleBackend)
+    assert backend.extension_notice

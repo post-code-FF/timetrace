@@ -10,7 +10,7 @@ a = Analysis(
     ["entry_point.py"],
     pathex=["../src"],
     datas=datas,
-    hiddenimports=["Xlib.ext.screensaver"],
+    hiddenimports=["Xlib.ext.screensaver", "_cffi_backend"],
     excludes=["PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.QtWebEngineQuick", "pytest"],
 )
 

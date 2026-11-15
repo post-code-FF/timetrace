@@ -1,3 +1,5 @@
+import pytest
+
 from timetrace.backends.idle_kde_wayland import WaylandExtIdleNotifyBackend
 
 
@@ -65,7 +67,8 @@ def test_stop_destroys_notification():
     assert client.notifications == {}
 
 
-def test_real_client_sends_registration_and_uses_input_only_idle(monkeypatch):
+@pytest.mark.parametrize("legacy", [False, True])
+def test_real_client_sends_registration_and_uses_input_only_idle(monkeypatch, legacy):
     """The simulated compositor cannot deliver idle before the request is flushed."""
     import socket
     import pywayland.client
@@ -76,6 +79,8 @@ def test_real_client_sends_registration_and_uses_input_only_idle(monkeypatch):
             self.dispatcher = {}
         def destroy(self):
             pass
+        def release(self):
+            self.released = True
 
     class Display:
         def __init__(self):
@@ -89,7 +94,7 @@ def test_real_client_sends_registration_and_uses_input_only_idle(monkeypatch):
         def get_registry(self):
             return self
         def roundtrip(self):
-            self.dispatcher['global'](self, 1, 'ext_idle_notifier_v1', 2)
+            self.dispatcher['global'](self, 1, 'org_kde_kwin_idle' if legacy else 'ext_idle_notifier_v1', 2)
             self.dispatcher['global'](self, 2, 'wl_seat', 9)
         def bind(self, ident, interface, version):
             return self
@@ -102,9 +107,12 @@ def test_real_client_sends_registration_and_uses_input_only_idle(monkeypatch):
         def get_input_idle_notification(self, timeout, seat):
             self.input_only = True
             return self.get_idle_notification(timeout, seat)
+        def get_idle_timeout(self, seat, timeout):
+            assert seat is self and timeout == 5000
+            return self.get_idle_notification(timeout, seat)
         def flush(self):
             for n in self.pending:
-                n.dispatcher['idled'](n)
+                n.dispatcher['idle' if legacy else 'idled'](n)
             self.pending.clear()
             return 0
         def dispatch(self, **kwargs):
@@ -114,12 +122,16 @@ def test_real_client_sends_registration_and_uses_input_only_idle(monkeypatch):
             self.writer.close()
 
     monkeypatch.setattr(pywayland.client, 'Display', Display)
+    monkeypatch.setattr('timetrace.backends.idle_kde_wayland.roundtrip', lambda display: display.roundtrip())
     client = PywaylandExtIdleClient()
     events = []
     try:
-        client.get_notification(5000, lambda: events.append('idle'), lambda: events.append('resume'))
+        handle = client.get_notification(5000, lambda: events.append('idle'), lambda: events.append('resume'))
         assert events == ['idle']
-        assert client._display.input_only
+        assert client._display.input_only is (not legacy)
+        client.destroy_notification(handle)
+        if legacy:
+            assert handle.released
     finally:
         client.stop()
     assert not client._dispatch_thread.is_alive()

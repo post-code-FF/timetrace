@@ -1,40 +1,20 @@
 #!/usr/bin/env bash
-# Собирает бинарники timetrace внутри Docker-контейнеров на разных базах,
-# а не на хосте, чтобы итоговый бинарник не требовал более новую glibc,
-# чем есть у конечных пользователей, и не тащил с собой библиотеки, которые
-# конфликтуют с системными на новых дистрибутивах. Подробности:
-# packaging/docker/README.md.
-#
-# Использование: build_in_docker.sh [legacy|standard|modern ...]
-# Без аргументов собираются все варианты. Результат: dist/timetrace-<вариант>.
+# Build all private runtimes; users install one package and never choose a runtime.
 set -euo pipefail
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-
-declare -A BASES=(
-    [legacy]="ubuntu:20.04"    # glibc 2.31
-    [standard]="ubuntu:22.04"  # glibc 2.35
-    [modern]="ubuntu:24.04"    # glibc 2.39
-)
-
-VARIANTS=("$@")
-[ ${#VARIANTS[@]} -gt 0 ] || VARIANTS=(legacy standard modern)
-
-mkdir -p "$SCRIPT_DIR/dist"
-
-for variant in "${VARIANTS[@]}"; do
-    base="${BASES[$variant]:-}"
-    [ -n "$base" ] || { echo "Неизвестный вариант: $variant (доступны: ${!BASES[*]})" >&2; exit 1; }
-    image="timetrace-build-$variant"
-
-    docker build -f "$SCRIPT_DIR/docker/Dockerfile" --build-arg "BASE_IMAGE=$base" \
-        -t "$image" "$REPO_ROOT"
-
+declare -A BASES=([2.31]="ubuntu:20.04" [2.35]="ubuntu:22.04" [2.39]="ubuntu:24.04")
+for libc in 2.31 2.35 2.39; do
+    image="timetrace-build-glibc-$libc"
+    qt_version=6.12.0
+    [ "$libc" != 2.31 ] || qt_version=6.9.3
+    docker build -f "$SCRIPT_DIR/docker/Dockerfile" --build-arg "BASE_IMAGE=${BASES[$libc]}" --build-arg "PYSIDE_VERSION=$qt_version" -t "$image" "$REPO_ROOT"
     container="$(docker create "$image")"
-    docker cp "$container:/build/packaging/dist/timetrace" "$SCRIPT_DIR/dist/timetrace-$variant"
+    trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+    directory="$SCRIPT_DIR/dist/runtimes/glibc-$libc"
+    mkdir -p "$directory"
+    docker cp "$container:/build/packaging/dist/timetrace" "$directory/timetrace"
     docker rm -f "$container" >/dev/null
-    chmod 755 "$SCRIPT_DIR/dist/timetrace-$variant"
-
-    echo "Собрано: $SCRIPT_DIR/dist/timetrace-$variant (база $base)"
+    trap - EXIT
+    chmod 755 "$directory/timetrace"
 done

@@ -97,7 +97,8 @@ def build_app(argv: list[str]):
     window = MainWindow(store, tz=tz)
     window.setWindowTitle("TimeTrace")
     def update_extension_notice():
-        extension_notice = getattr(window_backend, "extension_notice", None) or ""
+        extension_notice = " ".join(notice for backend in (window_backend, idle_backend)
+                                    if (notice := getattr(backend, "extension_notice", None)))
         if window.statusBar().currentMessage() != extension_notice:
             window.statusBar().showMessage(extension_notice)
 

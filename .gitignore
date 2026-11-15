@@ -19,3 +19,5 @@ packaging/pkgs/
 *.db-wal
 *.db-shm
 *.log
+
+packaging/arch-build/

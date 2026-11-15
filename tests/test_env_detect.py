@@ -6,6 +6,10 @@ def test_detects_kde():
     assert detect_desktop_environment({"XDG_CURRENT_DESKTOP": "KDE"}) == "kde"
 
 
+def test_cinnamon_is_not_confused_with_its_gnome_ancestry():
+    assert detect_desktop_environment({"XDG_CURRENT_DESKTOP": "X-Cinnamon:GNOME"}) == "cinnamon"
+
+
 def test_detects_gnome():
     assert detect_desktop_environment({"XDG_CURRENT_DESKTOP": "GNOME"}) == "gnome"
 

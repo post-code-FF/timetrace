@@ -1,0 +1,13 @@
+.git
+.superpowers
+.venv
+.pytest_cache
+**/__pycache__
+**/*.egg-info
+build
+dist
+packaging/build
+packaging/dist
+packaging/stage
+packaging/out
+packaging/arch-build

@@ -5,6 +5,7 @@
 # поэтому берём standalone-сборку через uv.
 ARG BASE_IMAGE=ubuntu:22.04
 FROM ${BASE_IMAGE}
+ARG PYSIDE_VERSION=6.12.0
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -55,7 +56,7 @@ COPY src ./src
 COPY packaging/entry_point.py packaging/pyinstaller.spec ./packaging/
 
 # pywayland: колесо на PyPI требует glibc >= 2.34, собираем из исходников.
-RUN uv pip install --no-cache --no-binary pywayland "." pyinstaller
+RUN uv pip install --no-cache --no-binary pywayland "PySide6==${PYSIDE_VERSION}" "." pyinstaller
 
 RUN cd packaging && pyinstaller --noconfirm pyinstaller.spec
 

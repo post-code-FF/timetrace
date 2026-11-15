@@ -8,6 +8,10 @@ from timetrace.__main__ import build_app
 
 
 def _force_primary_instance(monkeypatch):
+    # Empty desktop names now trigger real capability discovery. These wiring
+    # tests must also remove the host display to avoid touching its compositor.
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    monkeypatch.delenv("DISPLAY", raising=False)
     # build_app()'s single-instance guard registers "org.timetrace.App" on
     # the real session bus. On a machine that also happens to be running a
     # real TimeTrace instance (e.g. the developer's own desktop), that name
@@ -69,6 +73,8 @@ def test_build_app_runs_as_primary_instance_without_session_bus(tmp_path, monkey
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
     monkeypatch.setenv("XDG_CURRENT_DESKTOP", "")
     monkeypatch.setenv("XDG_SESSION_TYPE", "")
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    monkeypatch.delenv("DISPLAY", raising=False)
     monkeypatch.setattr(QDBusConnection, "isConnected", lambda self: False)
     monkeypatch.setattr(QDBusConnection, "registerService", lambda self, name: False)
 

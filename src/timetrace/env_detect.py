@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from typing import Literal
 
-DesktopEnv = Literal["kde", "gnome", "other"]
+DesktopEnv = Literal["kde", "gnome", "cinnamon", "other"]
 SessionType = Literal["x11", "wayland", "unknown"]
 
 
@@ -10,6 +10,8 @@ def detect_desktop_environment(env: Mapping[str, str] | None = None) -> DesktopE
 
     e = env if env is not None else os.environ
     value = e.get("XDG_CURRENT_DESKTOP", "").upper()
+    if "CINNAMON" in value:
+        return "cinnamon"
     if "KDE" in value:
         return "kde"
     if "GNOME" in value:

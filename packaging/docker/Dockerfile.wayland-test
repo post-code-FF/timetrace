@@ -1,0 +1,7 @@
+FROM timetrace-build-glibc-2.39
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sway labwc foot gjs dbus fonts-dejavu-core xvfb \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m tester
+USER tester
+WORKDIR /source

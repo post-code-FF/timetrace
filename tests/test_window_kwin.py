@@ -75,3 +75,61 @@ def test_fullscreen_reports_include_same_window_toggles_and_focus_loss():
     service.on_report('', '', 0, False)
     assert [e[0] for e in events] == [False, True, False]
     assert [w[0] for w in windows] == ['firefox', 'firefox', '']
+def test_failed_script_load_never_constructs_invalid_dbus_path(monkeypatch):
+    import pytest
+    from types import SimpleNamespace
+    from PySide6 import QtDBus
+    from timetrace.backends.window_kwin import QtKWinScriptLoader
+    loader = object.__new__(QtKWinScriptLoader)
+    loader._iface = SimpleNamespace(call=lambda *args: SimpleNamespace(arguments=lambda: [-1]))
+    def reject_invalid_path(*args):
+        raise AssertionError("must reject failed load before constructing a DBus path")
+    monkeypatch.setattr(QtDBus, "QDBusInterface", reject_invalid_path)
+    with pytest.raises(RuntimeError):
+        loader.load_and_start("script.js")
+
+
+def test_ukui_fork_uses_its_own_service_and_legacy_script_path(monkeypatch):
+    from types import SimpleNamespace
+    from PySide6 import QtDBus
+    from timetrace.backends.window_kwin import QtKWinScriptLoader
+    calls = []
+    bus = SimpleNamespace(interface=lambda: SimpleNamespace(
+        isServiceRegistered=lambda name: SimpleNamespace(isValid=lambda: True,
+                                                          value=lambda: name == "org.ukui.KWin")))
+    class Interface:
+        def __init__(self, service, path, interface, connection):
+            self.target = (service, path, interface)
+        def call(self, method, *args):
+            calls.append((*self.target, method, args))
+            return SimpleNamespace(arguments=lambda: [7] if method == "loadScript" else [])
+        def connection(self):
+            return bus
+    monkeypatch.setattr(QtDBus, "QDBusInterface", Interface)
+    loader = QtKWinScriptLoader(bus=bus)
+    assert loader.load_and_start("script.js") == 7
+    assert calls[-1] == ("org.ukui.KWin", "/7", "org.ukui.kwin.Scripting", "run", ())
+    loader.unload(7)
+    assert calls[-1][:4] == ("org.ukui.KWin", "/Scripting", "org.ukui.kwin.Scripting", "unloadScript")
+
+
+def test_kde_legacy_script_api_is_used_when_modern_object_is_absent(monkeypatch):
+    from types import SimpleNamespace
+    from PySide6 import QtDBus
+    from timetrace.backends.window_kwin import QtKWinScriptLoader
+    calls = []
+    bus = SimpleNamespace(interface=lambda: None)
+    class Interface:
+        def __init__(self, service, path, interface, connection):
+            self.target = (service, path, interface)
+        def isValid(self):
+            return self.target[1] != "/Scripting/Script4"
+        def connection(self):
+            return bus
+        def call(self, method, *args):
+            calls.append((*self.target, method))
+            return SimpleNamespace(arguments=lambda: [4])
+    monkeypatch.setattr(QtDBus, "QDBusInterface", Interface)
+    loader = QtKWinScriptLoader(bus=bus)
+    loader.load_and_start("script.js")
+    assert calls[-1] == ("org.kde.KWin", "/4", "org.kde.kwin.Scripting", "run")

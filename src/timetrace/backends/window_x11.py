@@ -20,6 +20,7 @@ class RealX11Client:
         self._net_active_window = self._display.intern_atom("_NET_ACTIVE_WINDOW")
         self._net_wm_pid = self._display.intern_atom("_NET_WM_PID")
         self._wm_class_atom = self._display.intern_atom("WM_CLASS")
+        self._wm_state = self._display.intern_atom("WM_STATE")
         self._net_wm_state = self._display.intern_atom("_NET_WM_STATE")
         self._fullscreen_atom = self._display.intern_atom("_NET_WM_STATE_FULLSCREEN")
         self._window_type = self._display.intern_atom("_NET_WM_WINDOW_TYPE")
@@ -48,12 +49,15 @@ class RealX11Client:
     def get_active_window_info(self) -> tuple[str, str | None] | None:
         self._fullscreen = False
         prop = self._root.get_full_property(self._net_active_window, 0)
-        if not prop or not prop.value:
-            return None
-        window_id = prop.value[0]
-        if not window_id:
-            return None
-        window = self._display.create_resource_object("window", window_id)
+        if prop is not None and len(prop.value):
+            window_id = prop.value[0]
+            if not window_id:
+                return None  # EWMH explicitly reports no active window.
+            window = self._display.create_resource_object("window", window_id)
+        else:
+            window = self._input_focus_window()
+            if window is None:
+                return None
         state = window.get_full_property(self._net_wm_state, 0)
         window_type = window.get_full_property(self._window_type, 0)
         shell_surface = window_type is not None and bool(self._shell_types.intersection(window_type.value))
@@ -63,6 +67,22 @@ class RealX11Client:
         wm_name = window.get_wm_name()
         title = wm_name if isinstance(wm_name, str) else None
         return resource_class, title
+
+    def _input_focus_window(self):
+        """ICCCM fallback for WMs without EWMH; never guess from pointer position."""
+        window = self._display.get_input_focus().focus
+        seen = set()
+        candidate = None
+        for _ in range(64):
+            if isinstance(window, int) or window.id in (0, 1, self._root.id) or window.id in seen:
+                break
+            seen.add(window.id)
+            if window.get_full_property(self._wm_state, 0) is not None:
+                return window
+            if window.get_wm_class():
+                candidate = window
+            window = window.query_tree().parent
+        return candidate
 
     def get_active_window_fullscreen(self) -> bool:
         return self._fullscreen

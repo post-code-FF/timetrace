@@ -1,26 +1,18 @@
-# Maintainer: <name> <email>
+# Uses the same payload as the Debian installer; no choice of runtime is needed.
 pkgname=timetrace-git
-pkgver=0.1.6
+pkgver=0.1.7
 pkgrel=1
-pkgdesc="Time tracker for Linux: any desktop on X11, KDE & GNOME on Wayland"
+pkgdesc="Time tracker for Linux desktops on X11 and Wayland"
 arch=('x86_64')
 url="https://github.com/post-code-FF/timetrace"
 license=('MIT')
-depends=()
+depends=('glibc>=2.31' 'libglvnd' 'libxkbcommon' 'libxcb' 'fontconfig' 'freetype2' 'dbus' 'glib2' 'wayland')
 provides=('timetrace')
 conflicts=('timetrace')
-makedepends=('imagemagick')
 options=('!strip' '!debug')
-source_x86_64=("timetrace-${pkgver}-x86_64.bin::https://github.com/post-code-FF/timetrace/releases/download/v${pkgver}/timetrace-modern")
-sha256sums_x86_64=('60756e4333190b62b5ffa8c6adfa6acaa7d428c8ff8e66be4272a9c4058ddd0e')
+source=("timetrace_${pkgver}_amd64.deb::https://github.com/post-code-FF/timetrace/releases/download/v${pkgver}/timetrace_${pkgver}_amd64.deb")
+sha256sums=('08faede0667a5d03694a99b4d16427cefc469911d0c4950255a005b0f7807d0f')
 
 package() {
-    install -Dm755 "${srcdir}/timetrace-${pkgver}-x86_64.bin" "${pkgdir}/usr/bin/timetrace"
-    install -Dm644 "${startdir}/timetrace.desktop" "${pkgdir}/usr/share/applications/timetrace.desktop"
-
-    install -d "${pkgdir}/usr/share/icons/hicolor/256x256/apps" "${pkgdir}/usr/share/pixmaps"
-    convert "${startdir}/icon.png" -resize 256x256 \
-        "${pkgdir}/usr/share/icons/hicolor/256x256/apps/timetrace.png"
-    install -Dm644 "${pkgdir}/usr/share/icons/hicolor/256x256/apps/timetrace.png" \
-        "${pkgdir}/usr/share/pixmaps/timetrace.png"
+    bsdtar -xf "$srcdir/data.tar.xz" -C "$pkgdir"
 }

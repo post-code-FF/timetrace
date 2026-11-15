@@ -7,14 +7,13 @@ from timetrace.env_detect import DesktopEnv, SessionType
 def select_idle_backend(desktop: DesktopEnv, session: SessionType) -> IdleBackend:
     if session == "x11":
         return X11ScreenSaverIdleBackend()
-    if session == "wayland" and desktop == "gnome":
-        try:
-            return NullIdleBackend()  # GNOME bridge supplies idle and lock together
-        except Exception:
-            return NullIdleBackend()
-    if session == "wayland" and desktop == "kde":
+    if session == "wayland" and desktop in ("gnome", "cinnamon"):
+        return NullIdleBackend()  # The shell bridge supplies idle and lock together.
+    if session == "wayland":
         try:
             return WaylandExtIdleNotifyBackend()
         except Exception:
-            return NullIdleBackend()
+            backend = NullIdleBackend()
+            backend.extension_notice = "Этот композитор не предоставляет ext/KDE idle API; определение простоя недоступно."
+            return backend
     return NullIdleBackend()

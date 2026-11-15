@@ -41,12 +41,21 @@ class QtKWinScriptLoader:
        had to be cleaned up individually via their own .stop() method).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, bus=None) -> None:
         from PySide6.QtDBus import QDBusConnection, QDBusInterface
 
-        bus = QDBusConnection.sessionBus()
+        bus = bus if bus is not None else QDBusConnection.sessionBus()
+        self._service = "org.kde.KWin"
+        bus_interface = bus.interface()
+        if bus_interface is not None:
+            for service in ("org.kde.KWin", "org.ukui.KWin"):
+                registered = bus_interface.isServiceRegistered(service)
+                if registered.isValid() and registered.value():
+                    self._service = service
+                    break
+        self._namespace = "org.ukui.kwin" if self._service == "org.ukui.KWin" else "org.kde.kwin"
         self._iface = QDBusInterface(
-            "org.kde.KWin", "/Scripting", "org.kde.kwin.Scripting", bus
+            self._service, "/Scripting", f"{self._namespace}.Scripting", bus
         )
 
     def load_and_start(self, script_path: str) -> int:
@@ -54,10 +63,17 @@ class QtKWinScriptLoader:
 
         reply = self._iface.call("loadScript", script_path, _KWIN_SCRIPT_PLUGIN_NAME)
         script_id = int(reply.arguments()[0])
-        script_iface_path = f"/Scripting/Script{script_id}"
+        if script_id < 0:
+            raise RuntimeError("KWin refused to load the TimeTrace script")
+        script_iface_path = f"/{script_id}" if self._service == "org.ukui.KWin" else f"/Scripting/Script{script_id}"
 
         bus = self._iface.connection()
-        script_iface = QDBusInterface("org.kde.KWin", script_iface_path, "org.kde.kwin.Script", bus)
+        script_interface = "org.ukui.kwin.Scripting" if self._service == "org.ukui.KWin" else "org.kde.kwin.Script"
+        script_iface = QDBusInterface(self._service, script_iface_path, script_interface, bus)
+        if self._service == "org.kde.KWin" and not script_iface.isValid():
+            # KWin 5 exposes numbered script objects using the Scripting
+            # interface; KWin 6 moved them below /Scripting/Script<id>.
+            script_iface = QDBusInterface(self._service, f"/{script_id}", "org.kde.kwin.Scripting", bus)
         script_iface.call("run")
         return script_id
 

@@ -29,5 +29,31 @@ def test_gnome_wayland_uses_shell_extension_backend():
     assert isinstance(select_window_backend("gnome", "wayland"), GnomeSessionBackend)
 
 
-def test_other_desktop_on_wayland_uses_null_backend():
+def test_other_desktop_on_wayland_uses_null_backend(monkeypatch):
+    def unavailable():
+        raise RuntimeError("not supported")
+    monkeypatch.setattr(window_factory, "WaylandActiveWindowBackend", unavailable)
+    monkeypatch.setattr(window_factory, "PollingWindowBackend", unavailable)
+    monkeypatch.setattr(window_factory, "kwin_available", lambda: False)
     assert isinstance(select_window_backend("other", "wayland"), NullActiveWindowBackend)
+
+
+def test_unknown_desktop_uses_protocol_capabilities(monkeypatch):
+    sentinel = object()
+    monkeypatch.setattr(window_factory, "WaylandActiveWindowBackend", lambda: sentinel)
+    assert select_window_backend("other", "wayland") is sentinel
+
+
+def test_lxqt_with_kwin_uses_running_compositor(monkeypatch):
+    def unavailable():
+        raise RuntimeError("not supported")
+    monkeypatch.setattr(window_factory, "WaylandActiveWindowBackend", unavailable)
+    monkeypatch.setattr(window_factory, "kwin_available", lambda: True)
+    sentinel = object()
+    monkeypatch.setattr(window_factory, "KWinScriptActiveWindowBackend", lambda: sentinel)
+    assert select_window_backend("other", "wayland") is sentinel
+
+
+def test_cinnamon_uses_built_in_bridge(qtbot):
+    from timetrace.backends.session_cinnamon import CinnamonSessionBackend
+    assert isinstance(select_window_backend("cinnamon", "wayland"), CinnamonSessionBackend)

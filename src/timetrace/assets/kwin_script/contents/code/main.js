@@ -31,5 +31,6 @@ function watchActiveWindow() {
     }
     report();
 }
-workspace.windowActivated.connect(watchActiveWindow);
+var activationSignal = workspace.windowActivated || workspace.clientActivated;
+activationSignal.connect(watchActiveWindow);
 watchActiveWindow();
