@@ -1,6 +1,6 @@
 # Uses the same payload as the Debian installer; no choice of runtime is needed.
 pkgname=timetrace-git
-pkgver=0.1.7
+pkgver=0.1.8
 pkgrel=1
 pkgdesc="Time tracker for Linux desktops on X11 and Wayland"
 arch=('x86_64')
@@ -9,9 +9,10 @@ license=('MIT')
 depends=('glibc>=2.31' 'libglvnd' 'libxkbcommon' 'libxcb' 'fontconfig' 'freetype2' 'dbus' 'glib2' 'wayland')
 provides=('timetrace')
 conflicts=('timetrace')
+install=timetrace.install
 options=('!strip' '!debug')
 source=("timetrace_${pkgver}_amd64.deb::https://github.com/post-code-FF/timetrace/releases/download/v${pkgver}/timetrace_${pkgver}_amd64.deb")
-sha256sums=('e3077bacc1d5b454d8659b50aa2d5c5c59cb2c32abebcdc344b4834c0398ed06')
+sha256sums=('46bfbc6d85842b019bdaf7fd6180725ea28201b3b6733a35c9ca524e20d0ddb0')
 
 package() {
     bsdtar -xf "$srcdir/data.tar.xz" -C "$pkgdir"

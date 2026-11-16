@@ -21,11 +21,11 @@ MAINTAINER="${TIMETRACE_MAINTAINER:-Angel04ek-murrmyau <makushinmaksim07@gmail.c
 common=(-s dir -n timetrace -v "$VERSION" --license MIT --maintainer "$MAINTAINER"
     --description "Time tracker for Linux desktops on X11 and Wayland"
     --url "https://github.com/post-code-FF/timetrace" -C "$STAGE_DIR")
-fpm "${common[@]}" -t deb --architecture amd64 --deb-compression xz \
+fpm "${common[@]}" --after-install "$SCRIPT_DIR/deb-postinst.sh" -t deb --architecture amd64 --deb-compression xz \
     -d 'libc6 (>= 2.31)' -d libgl1 -d libegl1 -d libxkbcommon0 -d libxcb1 \
     -d libfontconfig1 -d libfreetype6 -d libdbus-1-3 -d libglib2.0-0 -d libwayland-client0 \
     -p "$OUT_DIR/timetrace_${VERSION}_amd64.deb" .
-fpm "${common[@]}" -t rpm --architecture x86_64 --rpm-compression xz \
+fpm "${common[@]}" --after-install "$SCRIPT_DIR/rpm-post.sh" -t rpm --architecture x86_64 --rpm-compression xz \
     -d 'glibc >= 2.31' -d 'libGL.so.1()(64bit)' -d 'libEGL.so.1()(64bit)' \
     -d 'libxkbcommon.so.0()(64bit)' -d 'libxcb.so.1()(64bit)' \
     -d 'libfontconfig.so.1()(64bit)' -d 'libfreetype.so.6()(64bit)' \

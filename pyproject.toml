@@ -1,6 +1,6 @@
 [project]
 name = "timetrace"
-version = "0.1.7"
+version = "0.1.8"
 description = "Time tracker for Linux desktops on X11 and Wayland"
 requires-python = ">=3.11"
 dependencies = [

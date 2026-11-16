@@ -47,10 +47,12 @@ Weston, Enlightenment Wayland, Lomiri и ряда конфигураций не�
 
 Готовые пакеты — на странице [Releases](https://github.com/post-code-FF/timetrace/releases):
 
-- Debian / Ubuntu / Mint: `sudo apt install ./timetrace_0.1.7_amd64.deb`;
-- Fedora / совместимые RPM-дистрибутивы: `sudo dnf install ./timetrace-0.1.7-1.x86_64.rpm`
+- Debian / Ubuntu / Mint: `sudo apt install ./timetrace_0.1.8_amd64.deb`;
+- Fedora / совместимые RPM-дистрибутивы: `sudo dnf install ./timetrace-0.1.8-1.x86_64.rpm`
   (в openSUSE — `zypper install ./имя-пакета.rpm`);
-- Arch / CachyOS / EndeavourOS: `sudo pacman -U ./timetrace-git-0.1.7-1-x86_64.pkg.tar.zst`.
+- Arch / CachyOS / EndeavourOS: `sudo pacman -U ./timetrace-git-0.1.8-1-x86_64.pkg.tar.zst`.
+
+Начиная с 0.1.8, обновление любого из трёх пакетов автоматически перезапускает уже работающие экземпляры TimeTrace от имени их пользователей. История и настройки сохраняются; закрытое приложение при обновлении не запускается. Это работает и при переходе с пакетной версии 0.1.7. Независимые локальные копии вне `/usr/lib/timetrace` установщик не изменяет.
 
 Всего **три установочных пакета**, без пользовательских вариантов сборки.
 Каждый автоматически выбирает совместимые компоненты для glibc вашей системы;

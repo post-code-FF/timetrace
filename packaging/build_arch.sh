@@ -5,6 +5,7 @@ VERSION=$(sed -n 's/^version = "\([^"]*\)"/\1/p' "$SCRIPT_DIR/../pyproject.toml"
 BUILD_DIR="$SCRIPT_DIR/arch-build"
 mkdir -p "$BUILD_DIR"
 cp "$SCRIPT_DIR/PKGBUILD" "$BUILD_DIR/PKGBUILD"
+cp "$SCRIPT_DIR/timetrace.install" "$BUILD_DIR/timetrace.install"
 checksum=$(cat "$SCRIPT_DIR/out/deb.sha256")
 sed -i "s/^sha256sums=.*/sha256sums=('$checksum')/" "$BUILD_DIR/PKGBUILD"
 cp "$SCRIPT_DIR/out/timetrace_${VERSION}_amd64.deb" "$BUILD_DIR/"

@@ -53,6 +53,8 @@ jobs:
         run: bash packaging/build_arch.sh
       - name: Check package installation and GUI startup
         run: bash packaging/test_packages.sh
+      - name: Check upgrades restart running user instances
+        run: bash packaging/test_upgrades.sh
       - name: Prepare release assets
         run: |
           mkdir -p release-assets

@@ -21,3 +21,5 @@ packaging/pkgs/
 *.log
 
 packaging/arch-build/
+
+/packaging/upgrade-baseline/

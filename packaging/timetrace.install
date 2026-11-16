@@ -1,0 +1,4 @@
+post_upgrade() {
+    /usr/bin/timetrace --restart-running || printf '%s\n' 'TimeTrace: automatic restart failed; please restart the application manually.' >&2
+    return 0
+}

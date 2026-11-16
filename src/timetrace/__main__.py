@@ -180,6 +180,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     if argv[:1] == ["--version"]:
         print(f"timetrace {__version__}")
         return 0
+    from timetrace.package_restart import maintenance_main
+    maintenance_result = maintenance_main(argv)
+    if maintenance_result is not None:
+        return maintenance_result
     start_minimized = "--minimized" in argv
     argv = [a for a in argv if a != "--minimized"]
 
