@@ -81,7 +81,11 @@ def build_app(argv: list[str]):
     idle_backend = select_idle_backend(desktop, session)
     window_backend = select_window_backend(desktop, session)
     try:
-        sleep_backend = SleepMonitor()
+        if sys.platform == "win32":
+            from timetrace.backends.sleep_windows import WindowsSleepMonitor
+            sleep_backend = WindowsSleepMonitor()
+        else:
+            sleep_backend = SleepMonitor()
     except Exception:
         sleep_backend = NullSleepMonitor()
 

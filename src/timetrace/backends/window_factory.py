@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from timetrace.backends.window_base import ActiveWindowBackend, NullActiveWindowBackend
 from timetrace.backends.session_gnome import GnomeSessionBackend
@@ -25,6 +26,12 @@ def kwin_available():
 
 
 def select_window_backend(desktop: DesktopEnv, session: SessionType) -> ActiveWindowBackend:
+    if sys.platform == "win32":
+        from timetrace.backends.window_windows import WindowsActiveWindowBackend
+        try:
+            return WindowsActiveWindowBackend()
+        except Exception:
+            return NullActiveWindowBackend()
     if session == "x11":
         try:
             return X11EwmhActiveWindowBackend()
