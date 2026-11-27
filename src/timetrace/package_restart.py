@@ -6,7 +6,10 @@ privileges. Workers recheck procfs identity before touching their own process.
 from dataclasses import dataclass
 import os
 from pathlib import Path
-import pwd
+try:
+    import pwd
+except ModuleNotFoundError:  # Windows has no POSIX account database.
+    pwd = None
 import re
 import signal
 import subprocess
@@ -200,6 +203,8 @@ def restart_running(install_root: Path = INSTALL_ROOT) -> int:
 
 
 def maintenance_main(argv: list[str]) -> int | None:
+    if pwd is None:
+        return None
     if argv == ['--restart-running']:
         return restart_running()
     if argv[:1] == ['--restart-after-upgrade']:
