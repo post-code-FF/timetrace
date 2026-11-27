@@ -18,7 +18,7 @@ def pytest_collection_modifyitems(config, items):
             "test_idle_kde_wayland.py", "test_gnome_extension.py",
             "test_session_gnome.py", "test_session_cinnamon.py",
             "test_window_kwin.py", "test_idle_gnome.py",
-            "test_window_factory.py",
+            "test_window_factory.py", "test_main_bootstrap.py",
         } or (path == "test_icons.py" and item.name in {
             "test_nested_desktop_id_and_env_wrapped_exec",
             "test_xdg_and_flatpak_discovery",

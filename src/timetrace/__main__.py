@@ -47,12 +47,18 @@ def build_app(argv: list[str]):
     app.setDesktopFileName("timetrace")
     app.setWindowIcon(app_icon())
 
-    bus = QDBusConnection.sessionBus()
-    # Without a session bus (e.g. startx + a bare window manager) nobody else
-    # can own the name either, so a failed registration only means "another
-    # instance" when we are actually connected.
-    is_primary_instance = not bus.isConnected() or bus.registerService("org.timetrace.App")
+    if sys.platform == "win32":
+        from timetrace.single_instance_windows import WindowsSingleInstance
+        single_instance = WindowsSingleInstance()
+        is_primary_instance = single_instance.acquire(lambda: None)
+        bus = None
+    else:
+        single_instance = None
+        bus = QDBusConnection.sessionBus()
+        is_primary_instance = not bus.isConnected() or bus.registerService("org.timetrace.App")
     if not is_primary_instance:
+        if sys.platform == "win32":
+            return app, None, None, None, None
         iface = QDBusInterface("org.timetrace.App", "/App", "", bus)
         iface.call("Raise")
         return app, None, None, None, None
@@ -115,18 +121,26 @@ def build_app(argv: list[str]):
             config_path=paths.config_file_path(),
             on_idle_threshold_changed=coordinator.update_idle_threshold,
             on_theme_changed=set_theme,
-            exec_path="timetrace",
+            exec_path=sys.executable if sys.platform == "win32" else "timetrace",
         )
         dialog.exec()
         config = load_config(paths.config_file_path())
 
     window.settingsRequested.connect(open_settings)
 
-    raise_adaptor = _make_single_instance_adaptor(
-        lambda: (window.show(), window.raise_(), window.activateWindow())
-    )
-    bus.registerObject("/App", raise_adaptor, QDBusConnection.RegisterOption.ExportAllSlots)
-    window._raise_adaptor = raise_adaptor  # keep the QObject alive
+    if sys.platform == "win32":
+        def raise_window():
+            window.show()
+            window.raise_()
+            window.activateWindow()
+        single_instance.acquire(raise_window)
+        window._single_instance = single_instance
+    else:
+        raise_adaptor = _make_single_instance_adaptor(
+            lambda: (window.show(), window.raise_(), window.activateWindow())
+        )
+        bus.registerObject("/App", raise_adaptor, QDBusConnection.RegisterOption.ExportAllSlots)
+        window._raise_adaptor = raise_adaptor  # keep the QObject alive
 
     closed = False
 
@@ -140,6 +154,8 @@ def build_app(argv: list[str]):
         checkpoint_timer.stop()
         coordinator.stop()
         store.close()
+        if single_instance is not None:
+            single_instance.release()
 
     def quit_app() -> None:
         cleanup()
