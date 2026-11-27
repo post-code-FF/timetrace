@@ -2,12 +2,13 @@ import logging
 import sys
 
 from timetrace.backends.window_base import ActiveWindowBackend, NullActiveWindowBackend
-from timetrace.backends.session_gnome import GnomeSessionBackend
-from timetrace.backends.window_kwin import KWinScriptActiveWindowBackend
-from timetrace.backends.window_x11 import X11EwmhActiveWindowBackend
-from timetrace.backends.window_wayland import WaylandActiveWindowBackend
-from timetrace.backends.window_ipc import PollingWindowBackend
-from timetrace.backends.session_cinnamon import CinnamonSessionBackend
+if sys.platform != "win32":
+    from timetrace.backends.session_gnome import GnomeSessionBackend
+    from timetrace.backends.window_kwin import KWinScriptActiveWindowBackend
+    from timetrace.backends.window_x11 import X11EwmhActiveWindowBackend
+    from timetrace.backends.window_wayland import WaylandActiveWindowBackend
+    from timetrace.backends.window_ipc import PollingWindowBackend
+    from timetrace.backends.session_cinnamon import CinnamonSessionBackend
 from timetrace.env_detect import DesktopEnv, SessionType
 
 log = logging.getLogger(__name__)

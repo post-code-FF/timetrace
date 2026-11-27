@@ -1,8 +1,9 @@
 import sys
 
 from timetrace.backends.idle_base import IdleBackend, NullIdleBackend
-from timetrace.backends.idle_kde_wayland import WaylandExtIdleNotifyBackend
-from timetrace.backends.idle_x11 import X11ScreenSaverIdleBackend
+if sys.platform != "win32":
+    from timetrace.backends.idle_kde_wayland import WaylandExtIdleNotifyBackend
+    from timetrace.backends.idle_x11 import X11ScreenSaverIdleBackend
 from timetrace.env_detect import DesktopEnv, SessionType
 
 
