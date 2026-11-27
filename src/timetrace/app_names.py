@@ -8,6 +8,7 @@ Steam/Proton отдаёт окну класс ``steam_app_<id>``, Wine — им�
 
 import configparser
 import re
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -75,6 +76,9 @@ class AppNameResolver:
             known = self._exe_names.get(resource_class.lower())
             if known:
                 return known[0]
+            if sys.platform == "win32" and "\\" in resource_class:
+                from timetrace.windows_apps import executable_display_name
+                return executable_display_name(resource_class)
             return resource_class[: -len(".exe")]
         entry = find_entry(resource_class, self._desktop_dirs)
         if entry:

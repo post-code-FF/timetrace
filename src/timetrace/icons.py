@@ -1,3 +1,4 @@
+import sys
 from glob import escape
 from collections.abc import Sequence
 from pathlib import Path
@@ -40,6 +41,12 @@ def _real_icon_loader(icon_name: str):
 
     path = Path(icon_name)
     if path.is_absolute():
+        if sys.platform == "win32" and path.suffix.lower() in (".exe", ".dll"):
+            from PySide6.QtCore import QFileInfo
+            from PySide6.QtWidgets import QFileIconProvider
+            icon = QFileIconProvider().icon(QFileInfo(str(path)))
+            if not icon.pixmap(24, 24).isNull():
+                return icon
         return QIcon(str(path))
     icon = QIcon.fromTheme(icon_name)
     if not icon.pixmap(24, 24).isNull():

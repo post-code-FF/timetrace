@@ -40,7 +40,7 @@ class Win32WindowClient:
             buffer = ctypes.create_unicode_buffer(32768)
             size = ctypes.c_ulong(len(buffer))
             if self._kernel32.QueryFullProcessImageNameW(handle, 0, buffer, ctypes.byref(size)):
-                return buffer.value.rsplit("\\", 1)[-1]
+                return buffer.value
         finally:
             self._kernel32.CloseHandle(handle)
         return None

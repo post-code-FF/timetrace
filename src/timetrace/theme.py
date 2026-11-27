@@ -1,4 +1,5 @@
 # src/timetrace/theme.py
+import sys
 from typing import Callable, Literal
 
 ColorScheme = Literal["light", "dark", "unknown"]
@@ -46,6 +47,15 @@ def _portal_value_to_abstract(portal_value: int) -> int:
 
 
 def _real_reader() -> int:
+    if sys.platform == "win32":
+        import winreg
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as key:
+                value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+                return 0 if value else 1
+        except OSError:
+            return -1
     from PySide6.QtDBus import QDBusInterface
 
     iface = QDBusInterface(_SERVICE, _PATH, _INTERFACE)
@@ -64,6 +74,21 @@ def read_system_color_scheme(reader: Callable[[], int] | None = None) -> ColorSc
 
 
 def _real_subscriber(handler: Callable[[int], None]) -> Callable[[], None]:
+    if sys.platform == "win32":
+        from PySide6.QtCore import QTimer
+        last = _real_reader()
+
+        def poll() -> None:
+            nonlocal last
+            current = _real_reader()
+            if current != last:
+                last = current
+                handler(current)
+
+        timer = QTimer()
+        timer.timeout.connect(poll)
+        timer.start(2000)
+        return timer.stop
     from PySide6.QtCore import QObject, SLOT, Slot
     from PySide6.QtDBus import QDBusConnection
 
