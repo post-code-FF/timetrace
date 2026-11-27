@@ -1,8 +1,10 @@
 import os
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 
 APP_SLUG = "timetrace"
+IS_WINDOWS = sys.platform == "win32"
 
 
 def _env(env: Mapping[str, str] | None) -> Mapping[str, str]:
@@ -11,12 +13,18 @@ def _env(env: Mapping[str, str] | None) -> Mapping[str, str]:
 
 def config_dir(env: Mapping[str, str] | None = None) -> Path:
     e = _env(env)
+    if IS_WINDOWS and env is None:
+        base = e.get("APPDATA") or str(Path(e.get("USERPROFILE", str(Path.home()))) / "AppData" / "Roaming")
+        return Path(base) / "TimeTrace"
     base = e.get("XDG_CONFIG_HOME") or str(Path(e["HOME"]) / ".config")
     return Path(base) / APP_SLUG
 
 
 def data_dir(env: Mapping[str, str] | None = None) -> Path:
     e = _env(env)
+    if IS_WINDOWS and env is None:
+        base = e.get("LOCALAPPDATA") or str(Path(e.get("USERPROFILE", str(Path.home()))) / "AppData" / "Local")
+        return Path(base) / "TimeTrace"
     base = e.get("XDG_DATA_HOME") or str(Path(e["HOME"]) / ".local" / "share")
     return Path(base) / APP_SLUG
 
