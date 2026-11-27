@@ -24,7 +24,8 @@ def _make_single_instance_adaptor(on_raise):
 
 def build_app(argv: list[str]):
     from PySide6.QtCore import QTimer
-    from PySide6.QtDBus import QDBusConnection, QDBusInterface
+    if sys.platform != "win32":
+        from PySide6.QtDBus import QDBusConnection, QDBusInterface
     from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
     from timetrace import paths, theme
