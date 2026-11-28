@@ -11,48 +11,33 @@ jobs:
     name: TimeTrace.exe x64
     runs-on: windows-latest
     timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           architecture: 'x64'
-      - name: Install dependencies
+      - name: Create venv and install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e . pyinstaller pillow pefile
+          python -m venv .venv
+          .venv\Scripts\python.exe -m pip install --upgrade pip
+          .venv\Scripts\python.exe -m pip install -e . pyinstaller pillow pefile
       - name: Verify Qt has no ICU dependency (clean Windows / 8.1 compatibility)
-        shell: python
         run: |
-          import os, pefile, PySide6
-          dll = os.path.join(os.path.dirname(PySide6.__file__), 'Qt6Core.dll')
-          pe = pefile.PE(dll, fast_load=True)
-          pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_IMPORT']])
-          deps = [e.dll.decode().lower() for e in pe.DIRECTORY_ENTRY_IMPORT]
-          assert 'icuuc.dll' not in deps, 'Qt6Core.dll requires icuuc.dll - incompatible with clean Windows'
-          print('PySide6', PySide6.__version__, 'OK: no icuuc.dll import')
+          .venv\Scripts\python.exe -c "import os, pefile, PySide6; dll=os.path.join(os.path.dirname(PySide6.__file__),'Qt6Core.dll'); pe=pefile.PE(dll,fast_load=True); pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_IMPORT']]); deps=[e.dll.decode().lower() for e in pe.DIRECTORY_ENTRY_IMPORT]; assert 'icuuc.dll' not in deps, 'requires icuuc.dll'; print('PySide6',PySide6.__version__,'OK: no icuuc.dll')"
       - name: Build executable
-        shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File packaging\build_windows.ps1
       - name: Check executable is x64
-        shell: python
         run: |
-          import os, pefile
-          exe = 'packaging/out/TimeTrace.exe'
-          pe = pefile.PE(exe, fast_load=True)
-          assert pe.FILE_HEADER.Machine == 0x8664, 'not x64'
-          print('exe size', os.path.getsize(exe))
+          .venv\Scripts\python.exe -c "import os, pefile; pe=pefile.PE('packaging/out/TimeTrace.exe',fast_load=True); assert pe.FILE_HEADER.Machine==0x8664,'not x64'; print('exe size', os.path.getsize('packaging/out/TimeTrace.exe'))"
       - name: Merge SHA256SUMS (keep Linux checksums, refresh exe)
-        shell: python
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          import hashlib, subprocess
-          subprocess.run(['gh', 'release', 'download', 'v0.1.8', '-p', 'SHA256SUMS', '-O', 'old_sums'], check=True)
-          lines = [l for l in open('old_sums', encoding='ascii') if 'TimeTrace.exe' not in l]
-          digest = hashlib.sha256(open('packaging/out/TimeTrace.exe', 'rb').read()).hexdigest()
-          lines.append(f'{digest}  TimeTrace.exe\n')
-          open('packaging/out/SHA256SUMS', 'w', encoding='ascii').write(''.join(lines))
+          .venv\Scripts\python.exe -c "import hashlib, subprocess; subprocess.run(['gh','release','download','v0.1.8','-p','SHA256SUMS','-O','old_sums'],check=True); lines=[l for l in open('old_sums',encoding='ascii') if 'TimeTrace.exe' not in l]; d=hashlib.sha256(open('packaging/out/TimeTrace.exe','rb').read()).hexdigest(); lines.append(f'{d}  TimeTrace.exe\n'); open('packaging/out/SHA256SUMS','w',encoding='ascii').write(''.join(lines))"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: TimeTrace-windows-x64
